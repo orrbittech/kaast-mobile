@@ -62,7 +62,10 @@
           "color": "#ef4444",
           "sounds": []
         }
-      ]
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
