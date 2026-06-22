@@ -3,7 +3,7 @@ import {
     DrawerContentScrollView,
     DrawerItemList,
     type DrawerContentComponentProps,
-} from '@react-navigation/drawer';
+} from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useClerk } from '@clerk/clerk-expo';

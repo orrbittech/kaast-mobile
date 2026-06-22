@@ -905,17 +905,15 @@
     "@eslint/core" "^0.17.0"
     levn "^0.4.1"
 
-<<<<<<< Updated upstream
 "@expo-google-fonts/indie-flower@^0.4.1":
   version "0.4.1"
   resolved "https://registry.yarnpkg.com/@expo-google-fonts/indie-flower/-/indie-flower-0.4.1.tgz#918bf86af129bacc6f5644c938e517251dd2ef8c"
   integrity sha512-rgCHDBUVxAJ23If7vpmd/Oyg92X6JzUvwB+TJO4ICnXYYI7NNr9/A5Ulik/s7UdAB+l7Q+rOV6/pVpx9AIxuqA==
-=======
+
 "@expo-google-fonts/material-symbols@^0.4.1":
   version "0.4.38"
   resolved "https://registry.yarnpkg.com/@expo-google-fonts/material-symbols/-/material-symbols-0.4.38.tgz#88982312fb1a2ff18cd002874aaa9bbee0157727"
   integrity sha512-IJkBtN1o8u9BW5fvSii1MyHPQ7Q0HxbWcVBvOrOzgMLpVtZw7R2w94wBTVR7kZwv3w1JNTESMmLA5Sqn1+Z36A==
->>>>>>> Stashed changes
 
 "@expo-google-fonts/urbanist@^0.4.2":
   version "0.4.2"
@@ -2489,14 +2487,11 @@
   resolved "https://registry.yarnpkg.com/@stripe/stripe-js/-/stripe-js-5.6.0.tgz#cbb5b5f6110f870ca7de7e8ea3d189e9525a1019"
   integrity sha512-w8CEY73X/7tw2KKlL3iOk679V9bWseE4GzNz3zlaYxcTjmcmWOathRb0emgo/QQ3eoNzmq68+2Y2gxluAv3xGw==
 
-<<<<<<< Updated upstream
-=======
 "@stripe/stripe-react-native@0.64.0":
   version "0.64.0"
   resolved "https://registry.yarnpkg.com/@stripe/stripe-react-native/-/stripe-react-native-0.64.0.tgz#70e9cd578499af735607cbfb7cb67a9c96b11c47"
   integrity sha512-NQxFUMWJ7W/T1jEho3qd0XRnQGhXG6GdcoieG8JZo3IG/1QggugOVqEzvg1HRAq8S+cAGVXaj5CXfJuJsnF3eg==
 
->>>>>>> Stashed changes
 "@swc/helpers@^0.5.17":
   version "0.5.23"
   resolved "https://registry.yarnpkg.com/@swc/helpers/-/helpers-0.5.23.tgz#19287d0d86d962b111376039a50c792902c9a86a"
@@ -3447,16 +3442,6 @@ call-bind-apply-helpers@^1.0.1, call-bind-apply-helpers@^1.0.2:
     es-errors "^1.3.0"
     function-bind "^1.1.2"
 
-<<<<<<< Updated upstream
-call-bind@^1.0.0, call-bind@^1.0.2, call-bind@^1.0.7, call-bind@^1.0.8:
-  version "1.0.8"
-  resolved "https://registry.yarnpkg.com/call-bind/-/call-bind-1.0.8.tgz#0736a9660f537e3388826f440d5ec45f744eaa4c"
-  integrity sha512-oKlSFMcMwpUg2ednkhQ454wfWiU/ul3CkJe/PEHcTKuiX6RpbehUiFMXu13HalGZxfUwCQzZG747YXBn1im9ww==
-  dependencies:
-    call-bind-apply-helpers "^1.0.0"
-    es-define-property "^1.0.0"
-    get-intrinsic "^1.2.4"
-=======
 call-bind@^1.0.7, call-bind@^1.0.8, call-bind@^1.0.9:
   version "1.0.9"
   resolved "https://registry.yarnpkg.com/call-bind/-/call-bind-1.0.9.tgz#39a644700c80bc7d0ca9102fc6d1d43b2fd7eee7"
@@ -3465,7 +3450,6 @@ call-bind@^1.0.7, call-bind@^1.0.8, call-bind@^1.0.9:
     call-bind-apply-helpers "^1.0.2"
     es-define-property "^1.0.1"
     get-intrinsic "^1.3.0"
->>>>>>> Stashed changes
     set-function-length "^1.2.2"
 
 call-bound@^1.0.2, call-bound@^1.0.3, call-bound@^1.0.4:
@@ -4509,12 +4493,6 @@ expo-auth-session@~56.0.14:
     expo-web-browser "~56.0.5"
     invariant "^2.2.4"
 
-<<<<<<< Updated upstream
-expo-constants@~18.0.11, expo-constants@~18.0.12, expo-constants@~18.0.13:
-  version "18.0.13"
-  resolved "https://registry.yarnpkg.com/expo-constants/-/expo-constants-18.0.13.tgz#0117f1f3d43be7b645192c0f4f431fb4efc4803d"
-  integrity sha512-FnZn12E1dRYKDHlAdIyNFhBurKTS3F9CrfrBDJI5m3D7U17KBHMQ6JEfYlSj7LG7t+Ulr+IKaj58L1k5gBwTcQ==
-=======
 expo-camera@~56.0.8:
   version "56.0.8"
   resolved "https://registry.yarnpkg.com/expo-camera/-/expo-camera-56.0.8.tgz#a7803265516a302a33d92b5bdea06bbe3b88380e"
@@ -4526,7 +4504,6 @@ expo-constants@~56.0.18:
   version "56.0.18"
   resolved "https://registry.yarnpkg.com/expo-constants/-/expo-constants-56.0.18.tgz#f9be4f8af7470144578ac945bfa98c271cf39120"
   integrity sha512-8AMtbDGl/WVPnWlmbpGmvcdnNCy9E4PFnwdVwj600vljkMDPSxcAcjw8GVXEPk3PpZ+ngTqsrkltWyj0UKYAxw==
->>>>>>> Stashed changes
   dependencies:
     "@expo/env" "~2.3.0"
 
@@ -4619,12 +4596,6 @@ expo-notifications@~56.0.18:
     expo-application "~56.0.3"
     expo-constants "~56.0.18"
 
-<<<<<<< Updated upstream
-expo-router@~6.0.23:
-  version "6.0.23"
-  resolved "https://registry.yarnpkg.com/expo-router/-/expo-router-6.0.23.tgz#480fbcb4901fd692f9d11762f33894280dcbd75a"
-  integrity sha512-qCxVAiCrCyu0npky6azEZ6dJDMt77OmCzEbpF6RbUTlfkaCA417LvY14SBkk0xyGruSxy/7pvJOI6tuThaUVCA==
-=======
 expo-print@~56.0.4:
   version "56.0.4"
   resolved "https://registry.yarnpkg.com/expo-print/-/expo-print-56.0.4.tgz#43a305fabf772986d2ac895099442201a75edb03"
@@ -4634,7 +4605,6 @@ expo-router@~56.2.11:
   version "56.2.11"
   resolved "https://registry.yarnpkg.com/expo-router/-/expo-router-56.2.11.tgz#e8899aa342bb5676157e37c9336f0b622f610551"
   integrity sha512-08DBTrKv3QanOc9u1JNxSEChW9c/qNFbQ0dO28OLvufWWfdSRkSdHmh365D2FgoZg1qaOzZPCDuL3tM6nGSfkQ==
->>>>>>> Stashed changes
   dependencies:
     "@expo/log-box" "^56.0.13"
     "@expo/metro-runtime" "^56.0.15"
@@ -5927,17 +5897,10 @@ lru-cache@^5.1.1:
   dependencies:
     yallist "^3.0.2"
 
-<<<<<<< Updated upstream
-lucide-react-native@^0.577.0:
-  version "0.577.0"
-  resolved "https://registry.yarnpkg.com/lucide-react-native/-/lucide-react-native-0.577.0.tgz#b22ec66a6dde4cee901a97ae29dc3802654ba050"
-  integrity sha512-blWv/YqBMrgkYGAgm2wgWiGP1+1GNBf4f/sUlpyfEL8mxvSzhr7H/0MTS1xQgtd1B6gPC/JIPgP3kcdFjnh8zg==
-=======
 lucide-react-native@^1.8.0:
   version "1.21.0"
   resolved "https://registry.yarnpkg.com/lucide-react-native/-/lucide-react-native-1.21.0.tgz#7962eb1986506e4a14bf7d73c38a218e9d7dbdbc"
   integrity sha512-kP5ZNvIPKDsdRz09GpB5rMC0uUwwF+yqUJZjRqLo0p+KRMu9mK6JavevxeHPSV0wbUGRLIZn+bGnf0d6Ufu8UQ==
->>>>>>> Stashed changes
 
 makeerror@1.0.12:
   version "1.0.12"
@@ -6761,19 +6724,11 @@ prettier-plugin-tailwindcss@^0.5.11:
   resolved "https://registry.yarnpkg.com/prettier-plugin-tailwindcss/-/prettier-plugin-tailwindcss-0.5.14.tgz#4482eed357d5e22eac259541c70aca5a4c7b9d5c"
   integrity sha512-Puaz+wPUAhFp8Lo9HuciYKM2Y2XExESjeT+9NQoVFXZsPPnc9VYss2SpxdQ6vbatmt8/4+SN0oe0I1cPDABg9Q==
 
-<<<<<<< Updated upstream
 prettier@^3.4.2:
-  version "3.8.1"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.8.1.tgz#edf48977cf991558f4fcbd8a3ba6015ba2a3a173"
-  integrity sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==
+  version "3.8.4"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.8.4.tgz#f334f013ac04a96676f24dabc23c1c4ae1bae411"
+  integrity sha512-N2MylSdi48+5N/6S5j+maeHbUSIzzZ5uOcX5Hm4QpV8Dkb1HFjfAKTKX6yNPJQD9AhcT3ifHNB66tWTTJDi11Q==
 
-pretty-bytes@^5.6.0:
-  version "5.6.0"
-  resolved "https://registry.yarnpkg.com/pretty-bytes/-/pretty-bytes-5.6.0.tgz#356256f643804773c82f64723fe78c92c62beaeb"
-  integrity sha512-FFw039TmrBqFK8ma/7OL3sDz/VytdtJr044/QUJtH0wK9lb9jLq9tJyIxUwtQJHwar2BqtiA4iCWSwo9JLkzFg==
-
-=======
->>>>>>> Stashed changes
 pretty-format@^29.7.0:
   version "29.7.0"
   resolved "https://registry.yarnpkg.com/pretty-format/-/pretty-format-29.7.0.tgz#ca42c758310f365bfa71a0bda0a807160b776812"
@@ -6971,21 +6926,19 @@ react-native-screens@4.25.2, react-native-screens@^4.25.2:
     react-freeze "^1.0.0"
     warn-once "^0.1.0"
 
-<<<<<<< Updated upstream
-react-native-svg@^15.15.3:
-  version "15.15.3"
-  resolved "https://registry.yarnpkg.com/react-native-svg/-/react-native-svg-15.15.3.tgz#48baf15ad9610be816b37c03ffbb1f72c056a2b0"
-  integrity sha512-/k4KYwPBLGcx2f5d4FjE+vCScK7QOX14cl2lIASJ28u4slHHtIhL0SZKU7u9qmRBHxTCKPoPBtN6haT1NENJNA==
-=======
 react-native-svg@15.15.4:
   version "15.15.4"
   resolved "https://registry.yarnpkg.com/react-native-svg/-/react-native-svg-15.15.4.tgz#c029be85c20ead09c63dffa6b1ade06012f095ed"
   integrity sha512-boT/vIRgj6zZKBpfTPJJiYWMbZE9duBMOwPK6kCSTgxsS947IFMOq9OgIFkpWZTB7t229H24pDRkh3W9ZK/J1A==
->>>>>>> Stashed changes
   dependencies:
     css-select "^5.1.0"
     css-tree "^1.1.3"
     warn-once "0.1.1"
+
+react-native-toast-message@^2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/react-native-toast-message/-/react-native-toast-message-2.3.3.tgz#e301508d386a9902ff6b4559ecc6674f8cfdf97a"
+  integrity sha512-4IIUHwUPvKHu4gjD0Vj2aGQzqPATiblL1ey8tOqsxOWRPGGu52iIbL8M/mCz4uyqecvPdIcMY38AfwRuUADfQQ==
 
 react-native-url-polyfill@2.0.0:
   version "2.0.0"

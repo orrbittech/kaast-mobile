@@ -1,7 +1,6 @@
 import { Pressable } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { useNavigation } from '@react-navigation/native';
-import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from 'expo-router/react-navigation';
 import { ChevronLeft, Menu } from 'lucide-react-native';
 
 /**

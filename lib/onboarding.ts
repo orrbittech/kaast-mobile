@@ -23,7 +23,7 @@ export const SLIDES: OnboardingSlide[] = [
     {
         title: 'Manage media across stores: music, images, menus, and more from one flow',
     },
-    { title: 'Take take charge get sarted now', highlight: 'KAAST - -' },
+    { title: 'Take charge. Get started now', highlight: 'KAAST - -' },
 ];
 
 /**
