@@ -12,9 +12,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Play } from 'lucide-react-native';
 import {
     usePlaylist,
     useUpdatePlaylist,
@@ -22,13 +20,17 @@ import {
     useAddPlaylistItem,
     useUpdatePlaylistItem,
     useRemovePlaylistItem,
+    useMediaItems,
+    useActiveOrgContext,
 } from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
+import { MediaListItem } from '../../../components/MediaListItem';
+import { MediaCover } from '../../../components/MediaCover';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
-import { isImageUrl, getDisplayTitle } from '../../../lib/utils/media';
+import { getDisplayTitle, getMediaTypeForFilter } from '../../../lib/utils/media';
 
 function getItemTitle(item: { mediaUrl: string; title?: string | null }): string {
     return getDisplayTitle({
@@ -53,6 +55,8 @@ export default function PlaylistDetailScreen() {
         refetch,
         isRefetching,
     } = usePlaylist(id);
+    const { clerkOrgId } = useActiveOrgContext();
+    const { data: mediaItems } = useMediaItems(clerkOrgId);
     const updatePlaylist = useUpdatePlaylist(playlist?.clerkOrgId);
     const deletePlaylist = useDeletePlaylist(playlist?.clerkOrgId);
     const addItem = useAddPlaylistItem(id, playlist?.clerkOrgId);
@@ -69,6 +73,7 @@ export default function PlaylistDetailScreen() {
     const [editItemTitle, setEditItemTitle] = useState('');
     const [editItemUrl, setEditItemUrl] = useState('');
     const [addModalVisible, setAddModalVisible] = useState(false);
+    const [addMode, setAddMode] = useState<'library' | 'url'>('library');
     const [editName, setEditName] = useState('');
     const [addMediaUrl, setAddMediaUrl] = useState('');
     const [addTitle, setAddTitle] = useState('');
@@ -105,7 +110,10 @@ export default function PlaylistDetailScreen() {
     const onConfirmDeletePlaylist = async () => {
         if (!playlist) return;
         try {
-            await deletePlaylist.mutateAsync(playlist.id);
+            await deletePlaylist.mutateAsync({
+                id: playlist.id,
+                name: playlist.name,
+            });
             setConfirmDeletePlaylist(false);
             router.back();
         } catch {
@@ -123,10 +131,34 @@ export default function PlaylistDetailScreen() {
             setAddModalVisible(false);
             setAddMediaUrl('');
             setAddTitle('');
+            setAddMode('library');
         } catch {
             // Global NetworkErrorHandler shows error
         }
     };
+
+    const handleAddFromLibrary = async (media: {
+        mediaUrl: string;
+        title?: string;
+    }) => {
+        try {
+            await addItem.mutateAsync({
+                mediaUrl: media.mediaUrl,
+                title: media.title,
+            });
+            setAddModalVisible(false);
+            setAddMode('library');
+        } catch {
+            // Global NetworkErrorHandler shows error
+        }
+    };
+
+    const playlistMediaUrls = new Set(
+        playlist?.items?.map((item) => item.mediaUrl) ?? [],
+    );
+    const libraryItems =
+        mediaItems?.filter((item) => !playlistMediaUrls.has(item.mediaUrl)) ??
+        [];
 
     const openEditItemModal = (item: {
         id: string;
@@ -294,24 +326,17 @@ export default function PlaylistDetailScreen() {
                                         className="rounded-xl bg-zinc-800 p-4 flex-row items-center justify-between active:opacity-95"
                                     >
                                         <View className="w-14 h-14 rounded-lg bg-zinc-700 mr-4 overflow-hidden shrink-0">
-                                            {isImageUrl(item.mediaUrl) ? (
-                                                <Image
-                                                    source={{ uri: item.mediaUrl }}
-                                                    className="w-full h-full"
-                                                    contentFit="cover"
-                                                />
-                                            ) : (
-                                                <View className="flex-1 items-center justify-center">
-                                                    <Play size={24} color="#71717a" />
-                                                </View>
-                                            )}
+                                            <MediaCover
+                                                mediaUrl={item.mediaUrl}
+                                                fallbackSize="sm"
+                                            />
                                         </View>
                                         <View className="flex-1">
                                             <Text className="font-sans-medium text-white">
                                                 {getItemTitle(item)}
                                             </Text>
-                                            <Text className="text-zinc-400 text-sm mt-1" numberOfLines={1}>
-                                                {index + 1}. {item.mediaUrl}
+                                            <Text className="text-zinc-400 text-sm mt-1 capitalize">
+                                                {index + 1}. {getMediaTypeForFilter(item)}
                                             </Text>
                                         </View>
                                         <Pressable
@@ -409,68 +434,130 @@ export default function PlaylistDetailScreen() {
                     onPress={() => setAddModalVisible(false)}
                 >
                     <Pressable
-                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
+                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6 max-h-[85%]"
                         onPress={(e) => e.stopPropagation()}
                     >
                         <Text className="text-lg font-sans-semibold text-white mb-4">
                             Add Media Item
                         </Text>
-                        <KeyboardAvoidingView
-                            behavior={
-                                Platform.OS === 'ios' ? 'padding' : undefined
-                            }
-                        >
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Media URL
-                            </Text>
-                            <TextInput
-                                value={addMediaUrl}
-                                onChangeText={setAddMediaUrl}
-                                placeholder="https://..."
-                                placeholderTextColor="#71717a"
-                                style={{ fontFamily: 'Urbanist_400Regular' }}
-                                className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Title (optional)
-                            </Text>
-                            <TextInput
-                                value={addTitle}
-                                onChangeText={setAddTitle}
-                                placeholder="Display name"
-                                placeholderTextColor="#71717a"
-                                style={{ fontFamily: 'Urbanist_400Regular' }}
-                                className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                            />
-                        </KeyboardAvoidingView>
-                        <View className="flex-row gap-3">
+                        <View className="flex-row gap-2 mb-4">
+                            <Pressable
+                                onPress={() => setAddMode('library')}
+                                className={`flex-1 py-2.5 rounded-xl items-center ${
+                                    addMode === 'library' ? 'bg-approve' : 'bg-zinc-700'
+                                }`}
+                            >
+                                <Text className="font-sans-medium text-white text-sm">
+                                    From library
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setAddMode('url')}
+                                className={`flex-1 py-2.5 rounded-xl items-center ${
+                                    addMode === 'url' ? 'bg-approve' : 'bg-zinc-700'
+                                }`}
+                            >
+                                <Text className="font-sans-medium text-white text-sm">
+                                    From URL
+                                </Text>
+                            </Pressable>
+                        </View>
+                        {addMode === 'library' ? (
+                            <ScrollView className="max-h-80 mb-4">
+                                {libraryItems.length === 0 ? (
+                                    <View className="py-8 items-center">
+                                        <Text className="text-zinc-400 text-center">
+                                            No other media in your library yet. Add media from
+                                            the Media tab or switch to From URL.
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View className="gap-2">
+                                        {libraryItems.map((item) => (
+                                            <MediaListItem
+                                                key={item.id}
+                                                item={item}
+                                                onPress={() =>
+                                                    handleAddFromLibrary({
+                                                        mediaUrl: item.mediaUrl,
+                                                        title: item.title,
+                                                    })
+                                                }
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <>
+                                <KeyboardAvoidingView
+                                    behavior={
+                                        Platform.OS === 'ios' ? 'padding' : undefined
+                                    }
+                                >
+                                    <Text className="text-zinc-400 text-sm mb-2">
+                                        Media URL
+                                    </Text>
+                                    <TextInput
+                                        value={addMediaUrl}
+                                        onChangeText={setAddMediaUrl}
+                                        placeholder="https://..."
+                                        placeholderTextColor="#71717a"
+                                        style={{ fontFamily: 'Urbanist_400Regular' }}
+                                        className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
+                                    />
+                                    <Text className="text-zinc-400 text-sm mb-2">
+                                        Title (optional)
+                                    </Text>
+                                    <TextInput
+                                        value={addTitle}
+                                        onChangeText={setAddTitle}
+                                        placeholder="Display name"
+                                        placeholderTextColor="#71717a"
+                                        style={{ fontFamily: 'Urbanist_400Regular' }}
+                                        className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
+                                    />
+                                </KeyboardAvoidingView>
+                                <View className="flex-row gap-3">
+                                    <Pressable
+                                        onPress={() => setAddModalVisible(false)}
+                                        className="flex-1 py-3 rounded-xl bg-primary items-center"
+                                    >
+                                        <Text className="font-sans-medium text-white">
+                                            Cancel
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={handleAddItem}
+                                        disabled={
+                                            !addMediaUrl.trim() || addItem.isPending
+                                        }
+                                        className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
+                                    >
+                                        {addItem.isPending ? (
+                                            <ActivityIndicator
+                                                size="small"
+                                                color="#ffffff"
+                                            />
+                                        ) : (
+                                            <Text className="font-sans-medium text-white">
+                                                Add
+                                            </Text>
+                                        )}
+                                    </Pressable>
+                                </View>
+                            </>
+                        )}
+                        {addMode === 'library' && (
                             <Pressable
                                 onPress={() => setAddModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-primary items-center"
+                                className="py-3 rounded-xl bg-zinc-700 items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
                                 </Text>
                             </Pressable>
-                            <Pressable
-                                onPress={handleAddItem}
-                                disabled={
-                                    !addMediaUrl.trim() || addItem.isPending
-                                }
-                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                            >
-                                {addItem.isPending ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="#ffffff"
-                                    />
-                                ) : (
-                                    <Text className="font-sans-medium text-white">
-                                        Add
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
+                        )}
                     </Pressable>
                 </Pressable>
             </Modal>

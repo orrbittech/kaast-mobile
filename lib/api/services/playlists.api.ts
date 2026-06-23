@@ -100,4 +100,16 @@ export const playlistsApi = {
         );
         return data;
     },
+
+    /** GET /playlists/assigned/:deviceId - Assigned playlist with items for device */
+    getAssigned: async (
+        deviceId: string,
+        options?: ApiRequestOptions,
+    ): Promise<Playlist | null> => {
+        const { data } = await apiClient.get<Playlist | null>(
+            `/playlists/assigned/${encodeURIComponent(deviceId)}`,
+            { signal: options?.signal },
+        );
+        return data;
+    },
 };

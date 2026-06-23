@@ -27,10 +27,19 @@ export const playlistKeys = {
         [...playlistKeys.mediaLists(), clerkOrgId] as const,
     details: () => [...playlistKeys.all, 'detail'] as const,
     detail: (id: string) => [...playlistKeys.details(), id] as const,
+    assigned: (deviceId: string) =>
+        [...playlistKeys.all, 'assigned', deviceId] as const,
 };
 
 export const mediaSessionKeys = {
     all: ['mediaSession'] as const,
     detail: (deviceId: string) =>
         [...mediaSessionKeys.all, deviceId] as const,
+};
+
+export const mediaLibraryKeys = {
+    all: ['mediaLibrary'] as const,
+    lists: () => [...mediaLibraryKeys.all, 'list'] as const,
+    list: (clerkOrgId: string) =>
+        [...mediaLibraryKeys.lists(), clerkOrgId] as const,
 };

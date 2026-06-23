@@ -12,18 +12,40 @@ import {
     type CreatePlaylistItem,
     type UpdatePlaylistItem,
 } from '../api';
-import { invalidatePlaylists } from '../api/invalidate';
+import {
+    invalidatePlaylists,
+    invalidateDevices,
+    invalidateAfterPlaylistAssignment,
+} from '../api/invalidate';
+import { mediaApi } from '../api/services/media.api';
+import { deviceKeys, mediaSessionKeys } from '../api/query-keys';
+import type { DeviceWithMediaSession, MediaSession } from '../api/types';
 import { showSuccessNotification } from '../notifications/successNotification';
+import { getDisplayTitle } from '../utils/media';
 
 export type { Playlist, PlaylistItem } from '../api';
 
-/** List playlists for an organization. */
+/** List playlists for an organization (includes items for counts and covers). */
 export function usePlaylists(clerkOrgId: string | undefined) {
     return useQuery({
-        queryKey: playlistKeys.list(clerkOrgId ?? ''),
-        queryFn: ({ signal }) => playlistsApi.list(clerkOrgId!, { signal }),
+        queryKey: playlistKeys.mediaList(clerkOrgId ?? ''),
+        queryFn: ({ signal }) => playlistsApi.listWithItems(clerkOrgId!, { signal }),
         enabled: !!clerkOrgId,
         staleTime: 30_000,
+        refetchOnWindowFocus: true,
+    });
+}
+
+/** Assigned playlist with items for a device. */
+export function useAssignedPlaylist(
+    deviceId: string | undefined,
+    options?: { enabled?: boolean },
+) {
+    return useQuery<Playlist | null>({
+        queryKey: playlistKeys.assigned(deviceId ?? ''),
+        queryFn: ({ signal }) => playlistsApi.getAssigned(deviceId!, { signal }),
+        enabled: (options?.enabled ?? true) && !!deviceId,
+        staleTime: 15_000,
         refetchOnWindowFocus: true,
     });
 }
@@ -49,7 +71,7 @@ export function useCreatePlaylist(clerkOrgId?: string) {
             const orgId = data.clerkOrgId ?? clerkOrgId;
             if (orgId) {
                 queryClient.setQueryData(
-                    playlistKeys.list(orgId),
+                    playlistKeys.mediaList(orgId),
                     (old: Playlist[] | undefined) =>
                         old ? [...old, data] : [data],
                 );
@@ -75,7 +97,7 @@ export function useUpdatePlaylist(clerkOrgId: string | undefined) {
         onSuccess: (data, variables) => {
             if (clerkOrgId) {
                 queryClient.setQueryData(
-                    playlistKeys.list(clerkOrgId),
+                    playlistKeys.mediaList(clerkOrgId),
                     (old: Playlist[] | undefined) =>
                         old
                             ? old.map((p) =>
@@ -105,18 +127,19 @@ export function useDeletePlaylist(clerkOrgId: string | undefined) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: string) => playlistsApi.delete(id),
-        onSuccess: (_, id) => {
+        mutationFn: ({ id }: { id: string; name: string }) =>
+            playlistsApi.delete(id),
+        onSuccess: (_, { id, name }) => {
             queryClient.removeQueries({ queryKey: playlistKeys.detail(id) });
             if (clerkOrgId) {
                 queryClient.setQueryData(
-                    playlistKeys.list(clerkOrgId),
+                    playlistKeys.mediaList(clerkOrgId),
                     (old: Playlist[] | undefined) =>
                         old ? old.filter((p) => p.id !== id) : [],
                 );
                 invalidatePlaylists(queryClient, { clerkOrgId });
             }
-            showSuccessNotification('Playlist deleted');
+            showSuccessNotification('Playlist deleted', name);
         },
     });
 }
@@ -129,11 +152,15 @@ export function useAddPlaylistItem(playlistId: string | undefined, clerkOrgId?: 
         mutationFn: (body: CreatePlaylistItem) =>
             playlistsApi.addItem(playlistId!, body),
         onSuccess: (_, variables) => {
-            invalidatePlaylists(queryClient, {
-                playlistId: playlistId ?? undefined,
+            invalidateAfterPlaylistAssignment(queryClient, {
                 clerkOrgId,
+                playlistId: playlistId ?? undefined,
             });
-            const itemLabel = variables.mediaUrl ?? variables.title ?? 'Item';
+            invalidateDevices(queryClient);
+            const itemLabel = getDisplayTitle({
+                mediaUrl: variables.mediaUrl,
+                title: variables.title ?? undefined,
+            });
             showSuccessNotification('Added to playlist', itemLabel);
         },
     });
@@ -152,10 +179,11 @@ export function useUpdatePlaylistItem(playlistId: string | undefined, clerkOrgId
             body: UpdatePlaylistItem;
         }) => playlistsApi.updateItem(playlistId!, itemId, body),
         onSuccess: () => {
-            invalidatePlaylists(queryClient, {
+            invalidateAfterPlaylistAssignment(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
             });
+            invalidateDevices(queryClient);
         },
     });
 }
@@ -179,7 +207,8 @@ export function useBatchUpdatePlaylistItems(clerkOrgId?: string) {
             );
         },
         onSuccess: () => {
-            invalidatePlaylists(queryClient, { clerkOrgId });
+            invalidateAfterPlaylistAssignment(queryClient, { clerkOrgId });
+            invalidateDevices(queryClient);
             showSuccessNotification('Media updated');
         },
     });
@@ -200,7 +229,8 @@ export function useBatchRemovePlaylistItems(clerkOrgId?: string) {
             );
         },
         onSuccess: () => {
-            invalidatePlaylists(queryClient, { clerkOrgId });
+            invalidateAfterPlaylistAssignment(queryClient, { clerkOrgId });
+            invalidateDevices(queryClient);
             showSuccessNotification('Removed from playlists');
         },
     });
@@ -214,11 +244,103 @@ export function useRemovePlaylistItem(playlistId: string | undefined, clerkOrgId
         mutationFn: (itemId: string) =>
             playlistsApi.removeItem(playlistId!, itemId),
         onSuccess: () => {
-            invalidatePlaylists(queryClient, {
+            invalidateAfterPlaylistAssignment(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
             });
+            invalidateDevices(queryClient);
             showSuccessNotification('Removed from playlist');
+        },
+    });
+}
+
+/** Assign playlist to device and start playback on TV. */
+export function useLoadPlaylistOnDevice(clerkOrgId?: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            playlistId,
+            deviceId,
+            deviceDbId,
+            playlistName,
+        }: {
+            playlistId: string;
+            deviceId: string;
+            deviceDbId?: string;
+            playlistName: string;
+        }) => {
+            await playlistsApi.assign(playlistId, deviceId);
+            try {
+                await mediaApi.sendCommand({
+                    deviceId,
+                    command: 'playPlaylist',
+                    payload: { playlistId },
+                });
+            } catch {
+                // Device offline or WS unavailable — assignment is persisted; TV will pick up on connect
+            }
+            return { playlistId, deviceId, deviceDbId, playlistName };
+        },
+        onSuccess: ({ playlistId, deviceId, deviceDbId, playlistName }) => {
+            queryClient.setQueryData(
+                mediaSessionKeys.detail(deviceId),
+                (old: MediaSession | undefined) => ({
+                    deviceId,
+                    mediaUrl: old?.mediaUrl ?? null,
+                    position: 0,
+                    duration: old?.duration ?? 0,
+                    playing: true,
+                    volume: old?.volume ?? 1,
+                    snapshotData: old?.snapshotData ?? null,
+                    updatedAt: new Date().toISOString(),
+                }),
+            );
+
+            if (deviceDbId) {
+                queryClient.setQueryData(
+                    deviceKeys.detail(deviceDbId),
+                    (old: DeviceWithMediaSession | undefined) =>
+                        old
+                            ? {
+                                  ...old,
+                                  activePlaylistId: playlistId,
+                                  activePlaylist: { id: playlistId, name: playlistName },
+                                  mediaSession: {
+                                      mediaUrl: old.mediaSession?.mediaUrl ?? null,
+                                      position: 0,
+                                      duration: old.mediaSession?.duration ?? 0,
+                                      playing: true,
+                                      volume: old.mediaSession?.volume ?? 1,
+                                      snapshotData: old.mediaSession?.snapshotData ?? null,
+                                  },
+                              }
+                            : old,
+                );
+                if (clerkOrgId) {
+                    queryClient.setQueryData(
+                        deviceKeys.list(clerkOrgId),
+                        (old: import('../api').Device[] | undefined) =>
+                            old?.map((d) =>
+                                d.id === deviceDbId
+                                    ? { ...d, activePlaylistId: playlistId }
+                                    : d,
+                            ) ?? old,
+                    );
+                }
+            }
+
+            void queryClient.invalidateQueries({
+                queryKey: playlistKeys.assigned(deviceId),
+            });
+
+            invalidateAfterPlaylistAssignment(queryClient, {
+                clerkOrgId,
+                playlistId,
+                deviceHardwareId: deviceId,
+                deviceDbId,
+            });
+            showSuccessNotification('Playlist sent to device', playlistName);
         },
     });
 }
@@ -230,11 +352,13 @@ export function useAssignPlaylist(playlistId: string | undefined, clerkOrgId?: s
     return useMutation({
         mutationFn: (deviceId: string) =>
             playlistsApi.assign(playlistId!, deviceId),
-        onSuccess: () => {
-            invalidatePlaylists(queryClient, {
+        onSuccess: (_, deviceId) => {
+            invalidateAfterPlaylistAssignment(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
+                deviceHardwareId: deviceId,
             });
+            invalidateDevices(queryClient);
         },
     });
 }
@@ -246,11 +370,13 @@ export function useUnassignPlaylist(playlistId: string | undefined, clerkOrgId?:
     return useMutation({
         mutationFn: (deviceId: string) =>
             playlistsApi.unassign(playlistId!, deviceId),
-        onSuccess: () => {
-            invalidatePlaylists(queryClient, {
+        onSuccess: (_, deviceId) => {
+            invalidateAfterPlaylistAssignment(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
+                deviceHardwareId: deviceId,
             });
+            invalidateDevices(queryClient);
         },
     });
 }

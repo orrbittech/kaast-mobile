@@ -1,12 +1,12 @@
 import { View, Pressable } from 'react-native';
 import { Link } from 'expo-router';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Play, ChevronRight } from 'lucide-react-native';
 import { Text } from './ui/Text';
+import { MediaCover } from './MediaCover';
 import { colors } from '../lib/theme/colors';
 import type { Playlist, PlaylistItem } from '../lib/api';
-import { isImageUrl, getDisplayTitle } from '../lib/utils/media';
+import { getDisplayTitle, getFirstItemCoverUrl } from '../lib/utils/media';
 
 interface PlaylistCardProps {
     playlist: Playlist;
@@ -32,30 +32,18 @@ export function PlaylistCard({
 }: PlaylistCardProps) {
     const count = itemCount ?? playlist.items?.length ?? 0;
     const firstItem = playlist.items?.[0];
+    const coverUrl = getFirstItemCoverUrl(playlist.items);
     const previewLabel = firstItem
         ? getItemTitle(firstItem)
         : count === 0
           ? 'Empty playlist'
           : `${count} ${count === 1 ? 'item' : 'items'}`;
-    const showCover = firstItem && isImageUrl(firstItem.mediaUrl);
 
     return (
         <View className="rounded-2xl bg-zinc-800 overflow-hidden shadow-lg">
             {/* Cover / preview area */}
-            <View className="h-24 bg-zinc-700/60">
-                {showCover ? (
-                    <Image
-                        source={{ uri: firstItem!.mediaUrl }}
-                        className="w-full h-full"
-                        contentFit="cover"
-                    />
-                ) : (
-                    <View className="flex-1 items-center justify-center bg-zinc-700/80">
-                        <View className="w-14 h-14 rounded-full bg-primary/20 items-center justify-center">
-                            <Play size={28} color={colors.primaryHex} fill={colors.primaryHex} />
-                        </View>
-                    </View>
-                )}
+            <View className="h-24 bg-zinc-700/60 overflow-hidden">
+                <MediaCover mediaUrl={coverUrl} fallbackSize="md" />
             </View>
 
             {/* Highlight section: name, item count, location, preview */}

@@ -1,4 +1,4 @@
-import type { MediaItemDisplay } from '../hooks/useMediaItems';
+import type { PlaylistItem } from '../api/types';
 
 /** Check if URL points to an image (usable as cover art). */
 export function isImageUrl(url: string): boolean {
@@ -39,6 +39,13 @@ export function formatDurationShort(seconds?: number): string {
 }
 
 export type MediaFilterType = 'video' | 'audio' | 'image' | 'media';
+
+/** Cover URL from the first playlist item, if it is an image. */
+export function getFirstItemCoverUrl(items?: PlaylistItem[]): string | null {
+    const first = items?.[0];
+    if (!first?.mediaUrl || !isImageUrl(first.mediaUrl)) return null;
+    return first.mediaUrl;
+}
 
 export function getMediaTypeForFilter(item: { mediaUrl: string }): MediaFilterType {
     const url = item.mediaUrl.toLowerCase();

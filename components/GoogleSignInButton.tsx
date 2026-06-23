@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSSO } from '@clerk/clerk-expo';
 import { Text } from './ui/Text';
+import { showErrorNotification } from '../lib/notifications/successNotification';
 
 /**
  * Sign in with Google button - OAuth flow via browser.
@@ -31,7 +32,7 @@ export function GoogleSignInButton() {
                 err && typeof err === 'object' && 'message' in err
                     ? String((err as { message?: string }).message)
                     : 'An error occurred during Google Sign-In';
-            Alert.alert('Error', message);
+            void showErrorNotification('Error', message);
         } finally {
             setLoading(false);
         }

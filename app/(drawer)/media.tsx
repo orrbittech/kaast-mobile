@@ -17,9 +17,10 @@ import {
     useActiveOrgContext,
     useMediaItems,
     usePlaylists,
-    useBatchUpdatePlaylistItems,
-    useBatchRemovePlaylistItems,
-    useCreatePlaylist,
+    useCreateMediaItem,
+    useUpdateMediaItem,
+    useDeleteMediaItem,
+    useAddPlaylistItem,
 } from '../../lib/hooks';
 import type { MediaItemDisplay } from '../../lib/hooks';
 import { Text } from '../../components/ui/Text';
@@ -28,8 +29,7 @@ import { MediaCard } from '../../components/MediaCard';
 import { MediaListItem } from '../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 import { colors } from '../../lib/theme/colors';
-import { getUserFriendlyMessage, playlistsApi, invalidatePlaylists } from '../../lib/api';
-import { useQueryClient } from '@tanstack/react-query';
+import { getUserFriendlyMessage } from '../../lib/api';
 import { getDisplayTitle, getMediaTypeForFilter } from '../../lib/utils/media';
 
 /**
@@ -39,7 +39,6 @@ import { getDisplayTitle, getMediaTypeForFilter } from '../../lib/utils/media';
 export default function MediaScreen() {
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
-    const queryClient = useQueryClient();
 
     const { clerkOrgId, org: firstOrg } = useActiveOrgContext();
     const { data: playlists } = usePlaylists(clerkOrgId);
@@ -68,9 +67,12 @@ export default function MediaScreen() {
     const [editUrl, setEditUrl] = useState('');
     const [confirmRemoveItem, setConfirmRemoveItem] = useState<MediaItemDisplay | null>(null);
 
-    const batchUpdate = useBatchUpdatePlaylistItems(clerkOrgId);
-    const batchRemove = useBatchRemovePlaylistItems(clerkOrgId);
-    const createPlaylist = useCreatePlaylist(clerkOrgId);
+    const createMediaItem = useCreateMediaItem(clerkOrgId);
+    const updateMediaItem = useUpdateMediaItem(clerkOrgId);
+    const deleteMediaItem = useDeleteMediaItem(clerkOrgId);
+
+    const addPlaylistItem = useAddPlaylistItem(selectedPlaylistId ?? undefined, clerkOrgId);
+    const isAddingMedia = createMediaItem.isPending || addPlaylistItem.isPending;
 
     /** Filter media by type (video, audio, image) */
     const typeFilteredMediaItems = mediaItems
@@ -101,16 +103,13 @@ export default function MediaScreen() {
     const handleEditMedia = async () => {
         if (!editMediaItem || !editUrl.trim()) return;
         try {
-            await batchUpdate.mutateAsync(
-                editMediaItem.items.map((ref) => ({
-                    playlistId: ref.playlistId,
-                    itemId: ref.itemId,
-                    body: {
-                        mediaUrl: editUrl.trim(),
-                        title: editTitle.trim() || null,
-                    },
-                })),
-            );
+            await updateMediaItem.mutateAsync({
+                id: editMediaItem.id,
+                body: {
+                    url: editUrl.trim(),
+                    title: editTitle.trim() || undefined,
+                },
+            });
             setEditMediaItem(null);
         } catch {
             // Global NetworkErrorHandler shows error
@@ -125,12 +124,7 @@ export default function MediaScreen() {
     const onConfirmRemoveMedia = async () => {
         if (!confirmRemoveItem) return;
         try {
-            await batchRemove.mutateAsync(
-                confirmRemoveItem.items.map((ref) => ({
-                    playlistId: ref.playlistId,
-                    itemId: ref.itemId,
-                })),
-            );
+            await deleteMediaItem.mutateAsync(confirmRemoveItem.id);
             setConfirmRemoveItem(null);
         } catch {
             // Global NetworkErrorHandler shows error
@@ -139,31 +133,27 @@ export default function MediaScreen() {
 
     const handleAddMedia = async () => {
         if (!addMediaUrl.trim()) return;
+        const url = addMediaUrl.trim();
+        const title = addTitle.trim() || undefined;
         try {
-            let playlistId = selectedPlaylistId ?? playlists?.[0]?.id;
-            if (!playlistId) {
-                const created = await createPlaylist.mutateAsync({
-                    name: 'My Playlist',
+            await createMediaItem.mutateAsync({ url, title });
+            if (selectedPlaylistId) {
+                await addPlaylistItem.mutateAsync({
+                    mediaUrl: url,
+                    title,
                 });
-                playlistId = created.id;
             }
-            await playlistsApi.addItem(playlistId, {
-                mediaUrl: addMediaUrl.trim(),
-                title: addTitle.trim() || undefined,
-            });
-            invalidatePlaylists(queryClient, { clerkOrgId });
             setAddModalVisible(false);
             setAddMediaUrl('');
             setAddTitle('');
             setSelectedPlaylistId(null);
-            refetch();
         } catch {
             // Global NetworkErrorHandler shows error
         }
     };
 
     const openAddModal = () => {
-        setSelectedPlaylistId(playlists?.[0]?.id ?? null);
+        setSelectedPlaylistId(null);
         setAddModalVisible(true);
     };
 
@@ -273,7 +263,7 @@ export default function MediaScreen() {
                             <View className="py-12 items-center">
                                 <Text className="text-zinc-400 text-center mb-4">
                                     {mediaItems.length === 0
-                                        ? 'Add media to playlists to see it here.'
+                                        ? 'Add media URLs to build your library.'
                                         : `No ${typeFilter === 'all' ? '' : typeFilter} media found.`}
                                 </Text>
                                 {mediaItems.length === 0 && (
@@ -282,7 +272,7 @@ export default function MediaScreen() {
                                         className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
                                     >
                                         <Text className="font-sans-medium text-white">
-                                            Add Media to Playlist
+                                            Add Media
                                         </Text>
                                     </Pressable>
                                 )}
@@ -290,7 +280,7 @@ export default function MediaScreen() {
                         ) : viewMode === 'card' ? (
                             typeFilteredMediaItems.map((item) => (
                                 <MediaCard
-                                    key={item.mediaUrl}
+                                    key={item.id}
                                     item={item}
                                     onPress={() => openEditModal(item)}
                                 />
@@ -298,7 +288,7 @@ export default function MediaScreen() {
                         ) : (
                             typeFilteredMediaItems.map((item) => (
                                 <MediaListItem
-                                    key={item.mediaUrl}
+                                    key={item.id}
                                     item={item}
                                     onPress={() => openEditModal(item)}
                                 />
@@ -355,7 +345,7 @@ export default function MediaScreen() {
                                 ) : (
                                     filteredMediaItems.map((item) => (
                                         <MediaListItem
-                                            key={item.mediaUrl}
+                                            key={item.id}
                                             item={item}
                                             onPress={() => {
                                                 setSearchModalVisible(false);
@@ -434,7 +424,7 @@ export default function MediaScreen() {
                         onPress={(e) => e.stopPropagation()}
                     >
                         <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Add Media to Playlist
+                            Add Media
                         </Text>
                         <KeyboardAvoidingView
                             behavior={
@@ -464,9 +454,21 @@ export default function MediaScreen() {
                                 className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
                             />
                             <Text className="text-zinc-400 text-sm mb-2">
-                                Playlist
+                                Also add to playlist (optional)
                             </Text>
                             <View className="flex-row flex-wrap gap-2 mb-6">
+                                <Pressable
+                                    onPress={() => setSelectedPlaylistId(null)}
+                                    className={`px-3 py-2 rounded-lg ${
+                                        selectedPlaylistId === null
+                                            ? 'bg-approve'
+                                            : 'bg-zinc-700'
+                                    }`}
+                                >
+                                    <Text className="font-sans-medium text-white text-sm">
+                                        Library only
+                                    </Text>
+                                </Pressable>
                                 {playlists?.map((p) => (
                                     <Pressable
                                         key={p.id}
@@ -498,13 +500,11 @@ export default function MediaScreen() {
                             <Pressable
                                 onPress={handleAddMedia}
                                 disabled={
-                                    !addMediaUrl.trim() ||
-                                    !selectedPlaylistId ||
-                                    addItem.isPending
+                                    !addMediaUrl.trim() || isAddingMedia
                                 }
                                 className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
                             >
-                                {addItem.isPending ? (
+                                {isAddingMedia ? (
                                     <ActivityIndicator
                                         size="small"
                                         color="#ffffff"
@@ -578,11 +578,11 @@ export default function MediaScreen() {
                             <Pressable
                                 onPress={handleEditMedia}
                                 disabled={
-                                    !editUrl.trim() || batchUpdate.isPending
+                                    !editUrl.trim() || updateMediaItem.isPending
                                 }
                                 className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
                             >
-                                {batchUpdate.isPending ? (
+                                {updateMediaItem.isPending ? (
                                     <ActivityIndicator
                                         size="small"
                                         color="#ffffff"
@@ -600,7 +600,7 @@ export default function MediaScreen() {
                                 className="py-3 rounded-xl items-center active:opacity-90"
                             >
                                 <Text className="font-sans-medium text-primary">
-                                    Remove from all playlists
+                                    Delete media
                                 </Text>
                             </Pressable>
                         )}
@@ -610,13 +610,13 @@ export default function MediaScreen() {
 
             <ConfirmModal
                 visible={!!confirmRemoveItem}
-                title="Remove Media"
+                title="Delete Media"
                 message={
                     confirmRemoveItem
-                        ? `Remove "${getDisplayTitle(confirmRemoveItem)}" from all playlists? This cannot be undone.`
+                        ? `Delete "${getDisplayTitle(confirmRemoveItem)}" from your library? This cannot be undone.`
                         : ''
                 }
-                confirmText="Remove"
+                confirmText="Delete"
                 cancelText="Cancel"
                 confirmStyle="destructive"
                 onConfirm={onConfirmRemoveMedia}

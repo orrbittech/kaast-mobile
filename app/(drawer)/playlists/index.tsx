@@ -145,7 +145,10 @@ export default function PlaylistsScreen() {
     const onConfirmDelete = async () => {
         if (!confirmDelete) return;
         try {
-            await deletePlaylist.mutateAsync(confirmDelete.id);
+            await deletePlaylist.mutateAsync({
+                id: confirmDelete.id,
+                name: confirmDelete.name,
+            });
             setMenuPlaylist(null);
             setEditPlaylist(null);
             setConfirmDelete(null);
@@ -320,7 +323,7 @@ export default function PlaylistsScreen() {
                         ) : (
                             mediaItems.map((item) => (
                                 <MediaListItem
-                                    key={item.mediaUrl}
+                                    key={item.id}
                                     item={item}
                                 />
                             ))
@@ -484,7 +487,7 @@ export default function PlaylistsScreen() {
                                 ) : (
                                     filteredMediaItems.map((item) => (
                                         <MediaListItem
-                                            key={item.mediaUrl}
+                                            key={item.id}
                                             item={item}
                                         />
                                     ))

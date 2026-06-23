@@ -24,8 +24,17 @@ export {
     useBatchRemovePlaylistItems,
     useAssignPlaylist,
     useUnassignPlaylist,
+    useLoadPlaylistOnDevice,
+    useAssignedPlaylist,
 } from './usePlaylists';
-export { useMediaItems, type MediaItemDisplay } from './useMediaItems';
+export {
+    useMediaItems,
+    useCreateMediaItem,
+    useUpdateMediaItem,
+    useDeleteMediaItem,
+    type MediaItemDisplay,
+    type MediaItemRef,
+} from './useMediaLibrary';
 export { useDashboardSummary, type DashboardSummary } from './useDashboardSummary';
 export { useMediaSession } from './useMediaSession';
 export { useSendMediaCommand } from './useSendMediaCommand';

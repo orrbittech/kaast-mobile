@@ -1,13 +1,10 @@
 import { View, Pressable } from 'react-native';
-import { Image } from 'expo-image';
-import { Play } from 'lucide-react-native';
 import { Text } from './ui/Text';
-import { colors } from '../lib/theme/colors';
+import { MediaCover } from './MediaCover';
 import type { MediaItemDisplay } from '../lib/hooks';
 import {
     getDisplayTitle,
     getMediaTypeForFilter,
-    isImageUrl,
     formatDurationShort,
 } from '../lib/utils/media';
 
@@ -39,25 +36,14 @@ function truncateUrl(url: string, maxLen = 60): string {
 export function MediaCard({ item, onPress }: MediaCardProps) {
     const title = getDisplayTitle(item);
     const mediaType = getMediaTypeLabel(item.mediaUrl);
-    const showCover = isImageUrl(item.mediaUrl);
 
     return (
         <Pressable
             onPress={onPress}
             className="rounded-2xl bg-zinc-800 overflow-hidden active:opacity-90"
         >
-            <View className="h-36 bg-zinc-700/60 relative">
-                {showCover ? (
-                    <Image
-                        source={{ uri: item.mediaUrl }}
-                        style={{ width: '100%', height: '100%' }}
-                        contentFit="cover"
-                    />
-                ) : (
-                    <View className="flex-1 items-center justify-center">
-                        <Play size={32} color={colors.primaryHex} />
-                    </View>
-                )}
+            <View className="h-36 bg-zinc-700/60 relative overflow-hidden">
+                <MediaCover mediaUrl={item.mediaUrl} fallbackSize="md" />
                 <View className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 rounded">
                     <Text className="text-xs text-white">{mediaType}</Text>
                 </View>

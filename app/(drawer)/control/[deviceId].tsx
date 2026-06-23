@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Pressable, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { Image } from 'expo-image';
 import {
     SkipBack,
     Play,
@@ -12,25 +11,46 @@ import {
     Volume2,
 } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useDevice, useMediaSession, useSendMediaCommand } from '../../../lib/hooks';
+import {
+    useDevice,
+    useMediaSession,
+    useSendMediaCommand,
+    usePlaylists,
+    useLoadPlaylistOnDevice,
+    useAssignedPlaylist,
+    useActiveOrgContext,
+} from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
 import { RemoteControlButton } from '../../../components/RemoteControlButton';
+import { MediaCover } from '../../../components/MediaCover';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
-import { isImageUrl } from '../../../lib/utils/media';
+import { getDisplayTitle, getFirstItemCoverUrl } from '../../../lib/utils/media';
 import { mediaControlSocket } from '../../../lib/ws/media-control-socket';
-import type { MediaSession } from '../../../lib/api/types';
+import type { MediaSession, PlaylistItem } from '../../../lib/api/types';
 
 const VOLUME_STEP = 0.1;
 
-function getPreviewUri(session: MediaSession | null | undefined): string | null {
+function getPreviewUri(
+    session:
+        | Pick<MediaSession, 'snapshotData' | 'mediaUrl'>
+        | null
+        | undefined,
+): string | null {
     if (session?.snapshotData) {
         return `data:image/jpeg;base64,${session.snapshotData}`;
     }
-    if (session?.mediaUrl && isImageUrl(session.mediaUrl)) {
+    if (session?.mediaUrl) {
         return session.mediaUrl;
     }
     return null;
+}
+
+function getItemTitle(item: PlaylistItem): string {
+    return getDisplayTitle({
+        mediaUrl: item.mediaUrl,
+        title: item.title ?? undefined,
+    });
 }
 
 /**
@@ -44,11 +64,17 @@ export default function ControlScreen() {
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
     const { data: device, isLoading, error } = useDevice(deviceIdParam);
+    const { clerkOrgId } = useActiveOrgContext();
+    const { data: playlists } = usePlaylists(clerkOrgId ?? undefined);
+    const { data: assignedPlaylist } = useAssignedPlaylist(device?.deviceId);
     const sendCommand = useSendMediaCommand(device?.deviceId);
+    const loadPlaylist = useLoadPlaylistOnDevice(clerkOrgId ?? undefined);
     const embeddedSession = device?.mediaSession;
     const { data: polledSession } = useMediaSession(device?.deviceId);
     const [liveSession, setLiveSession] = useState<MediaSession | null>(null);
     const [optimisticVolume, setOptimisticVolume] = useState<number | null>(null);
+    const [loadPlaylistModalVisible, setLoadPlaylistModalVisible] = useState(false);
+    const [selectedLoadPlaylistId, setSelectedLoadPlaylistId] = useState<string | null>(null);
 
     const session = liveSession ?? polledSession ?? embeddedSession ?? null;
     const volume = optimisticVolume ?? session?.volume ?? 1;
@@ -99,6 +125,8 @@ export default function ControlScreen() {
     }
 
     const previewUri = getPreviewUri(session);
+    const fallbackCoverUrl = getFirstItemCoverUrl(assignedPlaylist?.items);
+    const previewMediaUrl = previewUri ?? fallbackCoverUrl;
     const position = session?.position ?? 0;
     const duration = session?.duration ?? 0;
 
@@ -134,6 +162,28 @@ export default function ControlScreen() {
         });
     };
 
+    const openLoadPlaylistModal = () => {
+        setSelectedLoadPlaylistId(device?.activePlaylistId ?? playlists?.[0]?.id ?? null);
+        setLoadPlaylistModalVisible(true);
+    };
+
+    const handleLoadPlaylist = async () => {
+        if (!device?.deviceId || !selectedLoadPlaylistId) return;
+        const playlist = playlists?.find((p) => p.id === selectedLoadPlaylistId);
+        if (!playlist) return;
+        try {
+            await loadPlaylist.mutateAsync({
+                playlistId: playlist.id,
+                deviceId: device.deviceId,
+                deviceDbId: device.id,
+                playlistName: playlist.name,
+            });
+            setLoadPlaylistModalVisible(false);
+        } catch {
+            // Global NetworkErrorHandler shows error
+        }
+    };
+
     return (
         <View
             className="flex-1 bg-base"
@@ -141,22 +191,8 @@ export default function ControlScreen() {
         >
             <View className="flex-1 px-6">
                 <View className="rounded-2xl bg-zinc-800 overflow-hidden mb-6">
-                    <View className="h-48 bg-zinc-700/60">
-                        {previewUri ? (
-                            <Image
-                                source={{ uri: previewUri }}
-                                style={{ width: '100%', height: '100%' }}
-                                contentFit="cover"
-                            />
-                        ) : (
-                            <View className="flex-1 items-center justify-center">
-                                <Ionicons
-                                    name="play-circle-outline"
-                                    size={64}
-                                    color={colors.primaryHex}
-                                />
-                            </View>
-                        )}
+                    <View className="h-48 bg-zinc-700/60 overflow-hidden">
+                        <MediaCover mediaUrl={previewMediaUrl} fallbackSize="lg" />
                     </View>
                 </View>
 
@@ -207,7 +243,158 @@ export default function ControlScreen() {
                         <Volume2 size={24} color="#fff" />
                     </RemoteControlButton>
                 </View>
+
+                <Pressable
+                    onPress={openLoadPlaylistModal}
+                    disabled={!playlists?.length || loadPlaylist.isPending}
+                    className="mt-8 flex-row items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 active:opacity-90 disabled:opacity-50"
+                >
+                    <Ionicons name="list-outline" size={20} color="#ffffff" />
+                    <Text className="font-sans-medium text-white">
+                        Load playlist
+                    </Text>
+                </Pressable>
+
+                <View className="mt-6">
+                    <Text className="text-zinc-400 text-sm font-sans-medium mb-2">
+                        Loaded playlist
+                    </Text>
+                    {!assignedPlaylist ? (
+                        <View className="rounded-xl bg-zinc-800 px-4 py-6 items-center">
+                            <Text className="text-zinc-500 text-sm text-center">
+                                No playlist loaded
+                            </Text>
+                        </View>
+                    ) : (
+                        <View className="rounded-xl bg-zinc-800 overflow-hidden">
+                            <View className="px-4 py-3 border-b border-zinc-700">
+                                <Text className="font-sans-semibold text-white">
+                                    {assignedPlaylist.name}
+                                </Text>
+                                <Text className="text-zinc-400 text-sm mt-0.5">
+                                    {assignedPlaylist.items?.length ?? 0}{' '}
+                                    {(assignedPlaylist.items?.length ?? 0) === 1
+                                        ? 'item'
+                                        : 'items'}
+                                </Text>
+                            </View>
+                            <ScrollView className="max-h-52">
+                                {assignedPlaylist.items?.map((item, index) => {
+                                    const isPlaying =
+                                        !!session?.mediaUrl &&
+                                        session.mediaUrl === item.mediaUrl;
+                                    return (
+                                        <View
+                                            key={item.id}
+                                            className={`flex-row items-center px-4 py-3 gap-3 ${
+                                                index > 0 ? 'border-t border-zinc-700/60' : ''
+                                            } ${isPlaying ? 'bg-zinc-700/40' : ''}`}
+                                        >
+                                            <View className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                                                <MediaCover
+                                                    mediaUrl={item.mediaUrl}
+                                                    fallbackSize="sm"
+                                                />
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text
+                                                    className={`font-sans-medium text-sm ${
+                                                        isPlaying ? 'text-approve' : 'text-white'
+                                                    }`}
+                                                    numberOfLines={1}
+                                                >
+                                                    {getItemTitle(item)}
+                                                </Text>
+                                                {isPlaying && (
+                                                    <Text className="text-approve text-xs mt-0.5">
+                                                        Now playing
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    )}
+                </View>
             </View>
+
+            <Modal
+                visible={loadPlaylistModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLoadPlaylistModalVisible(false)}
+            >
+                <Pressable
+                    className="flex-1 bg-black/60 justify-center items-center px-6"
+                    onPress={() => setLoadPlaylistModalVisible(false)}
+                >
+                    <Pressable
+                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6 max-h-[80%]"
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <Text className="text-lg font-sans-semibold text-white mb-2">
+                            Load playlist
+                        </Text>
+                        <Text className="text-zinc-400 text-sm mb-4">
+                            Starts playback on {device.name}.
+                        </Text>
+                        {!playlists?.length ? (
+                            <Text className="text-zinc-400 text-center py-4 mb-4">
+                                No playlists yet. Create one first.
+                            </Text>
+                        ) : (
+                            <ScrollView className="max-h-48 mb-6">
+                                <View className="flex-row flex-wrap gap-2">
+                                    {playlists.map((p) => (
+                                        <Pressable
+                                            key={p.id}
+                                            onPress={() => setSelectedLoadPlaylistId(p.id)}
+                                            className={`px-3 py-2 rounded-lg ${
+                                                selectedLoadPlaylistId === p.id
+                                                    ? 'bg-approve'
+                                                    : 'bg-zinc-700'
+                                            }`}
+                                        >
+                                            <Text className="font-sans-medium text-white text-sm">
+                                                {p.name}
+                                            </Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        )}
+                        <View className="flex-row gap-3">
+                            <Pressable
+                                onPress={() => setLoadPlaylistModalVisible(false)}
+                                className="flex-1 py-3 rounded-xl bg-zinc-700 items-center"
+                            >
+                                <Text className="font-sans-medium text-white">
+                                    Cancel
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={handleLoadPlaylist}
+                                disabled={
+                                    !selectedLoadPlaylistId ||
+                                    !playlists?.length ||
+                                    loadPlaylist.isPending
+                                }
+                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
+                            >
+                                {loadPlaylist.isPending ? (
+                                    <ActivityIndicator size="small" color="#ffffff" />
+                                ) : (
+                                    <Text className="font-sans-medium text-white">
+                                        Load & play
+                                    </Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }

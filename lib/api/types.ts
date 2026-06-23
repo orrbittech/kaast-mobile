@@ -7,6 +7,15 @@ export interface UserProfile {
     imageUrl?: string;
 }
 
+/** Resolved user for display (avatar + name) */
+export interface UserSummary {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    name?: string | null;
+    imageUrl?: string | null;
+}
+
 /** Location from locations API */
 export interface Location {
     id: string;
@@ -31,6 +40,8 @@ export interface Device {
 
 /** Device with media session from GET /devices/:id */
 export interface DeviceWithMediaSession extends Device {
+    creator?: UserSummary | null;
+    approver?: UserSummary | null;
     mediaSession?: {
         mediaUrl?: string | null;
         position: number;
@@ -38,6 +49,7 @@ export interface DeviceWithMediaSession extends Device {
         playing: boolean;
         volume?: number | null;
         snapshotData?: string | null;
+        updatedAt?: string;
     } | null;
     activePlaylist?: { id: string; name: string } | null;
 }
@@ -58,6 +70,35 @@ export interface MediaSession {
     volume?: number | null;
     snapshotData?: string | null;
     updatedAt?: string;
+}
+
+/** Org media library item from /media/library */
+export interface MediaLibraryItem {
+    id: string;
+    clerkUserId: string;
+    clerkOrgId?: string | null;
+    title: string;
+    url: string;
+    duration?: number | null;
+    mimeType?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+/** Create media library item request body */
+export interface CreateMediaLibraryItem {
+    url: string;
+    title?: string;
+    duration?: number | null;
+    mimeType?: string | null;
+}
+
+/** Update media library item request body */
+export interface UpdateMediaLibraryItem {
+    url?: string;
+    title?: string;
+    duration?: number | null;
+    mimeType?: string | null;
 }
 
 /** Create device request body */

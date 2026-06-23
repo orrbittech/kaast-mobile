@@ -3,7 +3,8 @@ import * as Notifications from 'expo-notifications';
 /** Show notifications as banner when app is in foreground */
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: false,
         shouldSetBadge: false,
     }),
@@ -49,6 +50,31 @@ export async function showSuccessNotification(
                 data: { type: 'success' },
             },
             trigger: null, // null = show immediately
+        });
+    } catch {
+        // Silently ignore if notifications fail (e.g. web, simulator)
+    }
+}
+
+/**
+ * Shows a local error notification as a push-style banner.
+ * Non-blocking alternative to Alert modals for API/network errors.
+ */
+export async function showErrorNotification(
+    title: string,
+    body?: string,
+): Promise<void> {
+    try {
+        const hasPermission = await requestNotificationPermissions();
+        if (!hasPermission) return;
+
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title,
+                body: body ?? '',
+                data: { type: 'error' },
+            },
+            trigger: null,
         });
     } catch {
         // Silently ignore if notifications fail (e.g. web, simulator)

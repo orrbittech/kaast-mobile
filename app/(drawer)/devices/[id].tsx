@@ -18,9 +18,11 @@ import {
     useUpdateDevice,
     useDeleteDevice,
     usePlaylists,
+    useLoadPlaylistOnDevice,
 } from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
+import { UserReferenceRow } from '../../../components/UserReferenceRow';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
 import { getStatusBadgeClasses } from '../../../lib/utils/device-status';
@@ -77,6 +79,12 @@ export default function DeviceDetailScreen() {
         locations?.find((l) => l.id === device?.locationId)?.name ?? 'Unassigned';
 
     const { data: playlists } = usePlaylists(clerkOrgId ?? undefined);
+    const loadPlaylist = useLoadPlaylistOnDevice(clerkOrgId ?? undefined);
+
+    const [loadPlaylistModalVisible, setLoadPlaylistModalVisible] = useState(false);
+    const [selectedLoadPlaylistId, setSelectedLoadPlaylistId] = useState<string | null>(
+        null,
+    );
 
     const handleEdit = async () => {
         if (!device || !editName.trim()) return;
@@ -117,6 +125,29 @@ export default function DeviceDetailScreen() {
             setEditLocationId(device.locationId ?? null);
             setEditActivePlaylistId(device.activePlaylistId ?? null);
             setEditModalVisible(true);
+        }
+    };
+
+    const openLoadPlaylistModal = () => {
+        if (device) {
+            setSelectedLoadPlaylistId(device.activePlaylistId ?? playlists?.[0]?.id ?? null);
+            setLoadPlaylistModalVisible(true);
+        }
+    };
+
+    const handleLoadPlaylist = async () => {
+        if (!device?.deviceId || !selectedLoadPlaylistId) return;
+        const playlist = playlists?.find((p) => p.id === selectedLoadPlaylistId);
+        if (!playlist) return;
+        try {
+            await loadPlaylist.mutateAsync({
+                playlistId: playlist.id,
+                deviceId: device.deviceId,
+                playlistName: playlist.name,
+            });
+            setLoadPlaylistModalVisible(false);
+        } catch {
+            // Global NetworkErrorHandler shows error
         }
     };
 
@@ -244,35 +275,31 @@ export default function DeviceDetailScreen() {
                             </Text>
                         </View>
                         <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-sm">Last played</Text>
+                            <Text className="text-zinc-500 text-sm">Last seen</Text>
                             <Text className="font-sans-medium text-white text-sm">
                                 {formatLastSeen(device.lastSeenAt)}
                             </Text>
                         </View>
+                        {session?.updatedAt && (
+                            <View className="flex-row justify-between">
+                                <Text className="text-zinc-500 text-sm">Last played</Text>
+                                <Text className="font-sans-medium text-white text-sm">
+                                    {formatLastSeen(session.updatedAt)}
+                                </Text>
+                            </View>
+                        )}
                         <View className="flex-row justify-between">
                             <Text className="text-zinc-500 text-sm">Current playlist</Text>
                             <Text className="font-sans-medium text-white text-sm">
                                 {device.activePlaylist?.name ?? '—'}
                             </Text>
                         </View>
-                        <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-sm">Creator</Text>
-                            <Text className="font-sans-medium text-white text-sm">
-                                {device.clerkUserId ?? '—'}
-                            </Text>
-                        </View>
+                        <UserReferenceRow label="Creator" user={device.creator} />
                         <View className="flex-row justify-between">
                             <Text className="text-zinc-500 text-sm">Plays</Text>
                             <Text className="font-sans-medium text-white text-sm">—</Text>
                         </View>
-                        <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-sm">Liked media</Text>
-                            <Text className="font-sans-medium text-white text-sm">—</Text>
-                        </View>
-                        <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-sm">Approver</Text>
-                            <Text className="font-sans-medium text-white text-sm">—</Text>
-                        </View>
+                        <UserReferenceRow label="Approver" user={device.approver} />
                         <View className="flex-row justify-between">
                             <Text className="text-zinc-500 text-sm">Created</Text>
                             <Text className="font-sans-medium text-white text-sm">
@@ -351,6 +378,16 @@ export default function DeviceDetailScreen() {
 
                 {/* Actions */}
                 <View className="gap-3">
+                    <Pressable
+                        onPress={openLoadPlaylistModal}
+                        disabled={!playlists?.length || loadPlaylist.isPending}
+                        className="flex-row items-center justify-center gap-3 py-4 rounded-xl bg-zinc-700 active:opacity-90 disabled:opacity-50"
+                    >
+                        <Ionicons name="list-outline" size={22} color="#ffffff" />
+                        <Text className="font-sans-medium text-white">
+                            Load playlist on device
+                        </Text>
+                    </Pressable>
                     <Link href={`/control/${device.id}`} asChild>
                         <Pressable className="flex-row items-center justify-center gap-3 py-4 rounded-xl bg-approve active:opacity-90">
                             <Ionicons name="play-outline" size={22} color="#ffffff" />
@@ -444,6 +481,81 @@ export default function DeviceDetailScreen() {
                                 ) : (
                                     <Text className="font-sans-medium text-white">
                                         Save
+                                    </Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* Load Playlist Modal */}
+            <Modal
+                visible={loadPlaylistModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLoadPlaylistModalVisible(false)}
+            >
+                <Pressable
+                    className="flex-1 bg-black/60 justify-center items-center px-6"
+                    onPress={() => setLoadPlaylistModalVisible(false)}
+                >
+                    <Pressable
+                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <Text className="text-lg font-sans-semibold text-white mb-2">
+                            Load playlist on device
+                        </Text>
+                        <Text className="text-zinc-400 text-sm mb-4">
+                            Assigns the playlist to {device.name} and starts playback on the TV.
+                        </Text>
+                        {!playlists?.length ? (
+                            <Text className="text-zinc-400 text-center py-4 mb-4">
+                                No playlists yet. Create one first.
+                            </Text>
+                        ) : (
+                            <View className="flex-row flex-wrap gap-2 mb-6">
+                                {playlists.map((p) => (
+                                    <Pressable
+                                        key={p.id}
+                                        onPress={() => setSelectedLoadPlaylistId(p.id)}
+                                        className={`px-3 py-2 rounded-lg ${
+                                            selectedLoadPlaylistId === p.id
+                                                ? 'bg-approve'
+                                                : 'bg-zinc-700'
+                                        }`}
+                                    >
+                                        <Text className="font-sans-medium text-white text-sm">
+                                            {p.name}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        )}
+                        <View className="flex-row gap-3">
+                            <Pressable
+                                onPress={() => setLoadPlaylistModalVisible(false)}
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
+                            >
+                                <Text className="font-sans-medium text-white">
+                                    Cancel
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={handleLoadPlaylist}
+                                disabled={
+                                    !selectedLoadPlaylistId ||
+                                    !playlists?.length ||
+                                    loadPlaylist.isPending
+                                }
+                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
+                            >
+                                {loadPlaylist.isPending ? (
+                                    <ActivityIndicator size="small" color="#ffffff" />
+                                ) : (
+                                    <Text className="font-sans-medium text-white">
+                                        Load & play
                                     </Text>
                                 )}
                             </Pressable>

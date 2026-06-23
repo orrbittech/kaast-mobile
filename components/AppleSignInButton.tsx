@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { Alert, Platform, Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSignInWithApple } from '@clerk/clerk-expo';
 import { Text } from './ui/Text';
+import { showErrorNotification } from '../lib/notifications/successNotification';
 
 /**
  * Sign in with Apple button - native flow, iOS only.
@@ -33,7 +34,7 @@ export function AppleSignInButton() {
                 err && typeof err === 'object' && 'message' in err
                     ? String((err as { message?: string }).message)
                     : 'An error occurred during Apple Sign-In';
-            Alert.alert('Error', message);
+            void showErrorNotification('Error', message);
         }
     }, [startAppleAuthenticationFlow, router]);
 
