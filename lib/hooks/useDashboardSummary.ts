@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useOrganizations } from './useOrganizations';
-import { useLocations } from './useLocations';
+import { useActiveOrgContext } from './useActiveOrgContext';
 import { useDevices } from './useDevices';
 import { usePlaylists } from './usePlaylists';
 import { useMediaItems } from './useMediaItems';
@@ -15,25 +14,24 @@ export interface DashboardSummary {
     activePlaylistCount: number;
     clerkOrgId: string | undefined;
     firstLocationId: string | undefined;
+    firstDeviceId: string | undefined;
+    firstDeviceDbId: string | undefined;
+    firstDeviceName: string | undefined;
     isLoading: boolean;
     error: Error | null;
 }
 
 /**
  * Aggregates org, location, devices, playlists, and media for dashboard summary.
- * Computes total/active/inactive devices, media count, play time, and active playlists.
  */
 export function useDashboardSummary(): DashboardSummary {
-    const { data: orgs } = useOrganizations();
-    const firstOrg = orgs?.[0];
-    const clerkOrgId = firstOrg?.clerkOrgId ?? firstOrg?.id;
-    const { data: locations } = useLocations(clerkOrgId);
-    const firstLocationId = locations?.[0]?.id;
+    const { clerkOrgId, firstLocationId, isLoading: orgLoading, error } =
+        useActiveOrgContext();
     const { data: devices, isLoading: devicesLoading } = useDevices(clerkOrgId);
     const { data: playlists, isLoading: playlistsLoading } =
-        usePlaylists(firstLocationId);
+        usePlaylists(clerkOrgId);
     const { data: mediaItems, isLoading: mediaLoading } =
-        useMediaItems(firstLocationId);
+        useMediaItems(clerkOrgId);
 
     const summary = useMemo(() => {
         const totalDevices = devices?.length ?? 0;
@@ -51,6 +49,7 @@ export function useDashboardSummary(): DashboardSummary {
                 .filter((id): id is string => !!id) ?? [],
         );
         const activePlaylistCount = activePlaylistIds.size;
+        const firstDevice = devices?.[0];
 
         return {
             totalDevices,
@@ -60,11 +59,14 @@ export function useDashboardSummary(): DashboardSummary {
             totalPlayTimeSec,
             totalPlaylists,
             activePlaylistCount,
+            firstDeviceId: firstDevice?.deviceId,
+            firstDeviceDbId: firstDevice?.id,
+            firstDeviceName: firstDevice?.name,
         };
     }, [devices, mediaItems, playlists]);
 
-    const isLoading = devicesLoading || playlistsLoading || mediaLoading;
-    const error = null; // Individual hooks handle errors; dashboard could surface if needed
+    const isLoading =
+        orgLoading || devicesLoading || playlistsLoading || mediaLoading;
 
     return {
         ...summary,

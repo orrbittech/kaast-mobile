@@ -26,28 +26,15 @@ import {
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
+import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
+import { isImageUrl, getDisplayTitle } from '../../../lib/utils/media';
 
-/** Derive display title from URL or item title */
 function getItemTitle(item: { mediaUrl: string; title?: string | null }): string {
-    if (item.title?.trim()) return item.title;
-    try {
-        const pathname = new URL(item.mediaUrl).pathname;
-        return pathname.split('/').pop() ?? item.mediaUrl;
-    } catch {
-        return item.mediaUrl;
-    }
-}
-
-/** Check if URL is an image (can be used as cover) */
-function isImageUrl(url: string): boolean {
-    try {
-        const ext = url.split('.').pop()?.toLowerCase() ?? '';
-        const path = url.toLowerCase();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || path.includes('image');
-    } catch {
-        return false;
-    }
+    return getDisplayTitle({
+        mediaUrl: item.mediaUrl,
+        title: item.title ?? undefined,
+    });
 }
 
 /**
@@ -66,11 +53,11 @@ export default function PlaylistDetailScreen() {
         refetch,
         isRefetching,
     } = usePlaylist(id);
-    const updatePlaylist = useUpdatePlaylist(playlist?.locationId);
-    const deletePlaylist = useDeletePlaylist(playlist?.locationId);
-    const addItem = useAddPlaylistItem(id);
-    const updatePlaylistItem = useUpdatePlaylistItem(id);
-    const removeItem = useRemovePlaylistItem(id);
+    const updatePlaylist = useUpdatePlaylist(playlist?.clerkOrgId);
+    const deletePlaylist = useDeletePlaylist(playlist?.clerkOrgId);
+    const addItem = useAddPlaylistItem(id, playlist?.clerkOrgId);
+    const updatePlaylistItem = useUpdatePlaylistItem(id, playlist?.clerkOrgId);
+    const removeItem = useRemovePlaylistItem(id, playlist?.clerkOrgId);
 
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editItemModalVisible, setEditItemModalVisible] = useState(false);
@@ -209,13 +196,13 @@ export default function PlaylistDetailScreen() {
                     <RefreshControl
                         refreshing={isRefetching && !isLoading}
                         onRefresh={() => refetch()}
-                        tintColor="#ef4444"
+                        tintColor={colors.primaryHex}
                     />
                 }
             >
                 {isLoading && (
                     <View className="py-12 items-center">
-                        <ActivityIndicator size="large" color="#ef4444" />
+                        <ActivityIndicator size="large" color={colors.primaryHex} />
                     </View>
                 )}
 
@@ -269,7 +256,7 @@ export default function PlaylistDetailScreen() {
                                     <Ionicons
                                         name="trash-outline"
                                         size={22}
-                                        color="#ef4444"
+                                        color={colors.primaryHex}
                                     />
                                 </Pressable>
                             </View>
@@ -381,7 +368,7 @@ export default function PlaylistDetailScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -459,7 +446,7 @@ export default function PlaylistDetailScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setAddModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -527,9 +514,9 @@ export default function PlaylistDetailScreen() {
                                 <Ionicons
                                     name="trash-outline"
                                     size={22}
-                                    color="#ef4444"
+                                    color={colors.primaryHex}
                                 />
-                                <Text className="font-sans-medium text-red-500">
+                                <Text className="font-sans-medium text-primary">
                                     Remove from playlist
                                 </Text>
                             </Pressable>

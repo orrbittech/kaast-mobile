@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+README.md
+**/*.md
+scripts/reset-project.js

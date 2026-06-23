@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { setOnboardingComplete, SLIDES } from '../../lib/onboarding';
+import { colors } from '../../lib/theme/colors';
 import { Text } from '../../components/ui/Text';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -79,7 +80,7 @@ export default function OnboardingScreen() {
                                         style={{
                                             width: 95 * 2,
                                             height: 198 * 2,
-                                            backgroundColor: 'hsl(0 72% 52%)',
+                                            backgroundColor: colors.primary,
                                             transform: [{ rotate: '-6deg' }],
                                         }}
                                     />
@@ -88,7 +89,7 @@ export default function OnboardingScreen() {
                                         style={{
                                             width: 95 * 2,
                                             height: 172 * 2,
-                                            backgroundColor: 'hsl(0 72% 52%)',
+                                            backgroundColor: colors.primary,
                                             transform: [
                                                 { rotate: '4deg' },
                                                 { translateY: 8 },
@@ -102,7 +103,7 @@ export default function OnboardingScreen() {
                                     <Text
                                         className="text-center p-3"
                                         style={{
-                                            color: 'hsl(0 72% 52%)',
+                                            color: colors.primary,
                                             fontFamily: 'IndieFlower_400Regular',
                                             fontSize: 35,
                                             fontWeight: '800',

@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { playlistsApi, playlistKeys } from '../api';
-import { usePlaylists } from './usePlaylists';
 
 /** Playlist item reference for update/remove operations */
 export interface MediaItemRef {
@@ -21,26 +20,19 @@ export interface MediaItemDisplay {
 }
 
 /**
- * Fetches playlists for location, then fetches each playlist with items,
- * and aggregates media URLs deduplicated by URL.
+ * Fetches playlists with items in a single request and aggregates media URLs.
  */
-export function useMediaItems(locationId: string | undefined) {
-    const { data: playlists, ...playlistsQuery } = usePlaylists(locationId);
-    const playlistIds = playlists?.map((p) => p.id) ?? [];
-    const playlistNamesMap = useMemo(
-        () => new Map(playlists?.map((p) => [p.id, p.name]) ?? []),
-        [playlists],
-    );
-
-    const playlistQueries = useQueries({
-        queries: playlistIds.map((id) => ({
-            queryKey: playlistKeys.detail(id),
-            queryFn: () => playlistsApi.getById(id),
-            enabled: !!locationId && playlistIds.length > 0,
-        })),
+export function useMediaItems(clerkOrgId: string | undefined) {
+    const query = useQuery({
+        queryKey: playlistKeys.mediaList(clerkOrgId ?? ''),
+        queryFn: ({ signal }) => playlistsApi.listWithItems(clerkOrgId!, { signal }),
+        enabled: !!clerkOrgId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: true,
     });
 
     const mediaItems = useMemo((): MediaItemDisplay[] => {
+        const playlists = query.data ?? [];
         const map = new Map<
             string,
             {
@@ -54,24 +46,22 @@ export function useMediaItems(locationId: string | undefined) {
             }
         >();
 
-        playlistQueries.forEach((q, i) => {
-            const playlist = q.data;
-            const playlistId = playlistIds[i];
-            if (!playlist?.items || !playlistId) return;
-
-            const playlistName = playlistNamesMap.get(playlistId) ?? playlist.name;
-
+        for (const playlist of playlists) {
+            if (!playlist.items) continue;
             for (const item of playlist.items) {
                 const itemCreatedAt = item.createdAt;
-                const itemRef: MediaItemRef = { playlistId, itemId: item.id };
+                const itemRef: MediaItemRef = { playlistId: playlist.id, itemId: item.id };
                 const existing = map.get(item.mediaUrl);
                 if (existing) {
                     existing.items.push(itemRef);
-                    if (!existing.playlistIds.includes(playlistId)) {
-                        existing.playlistIds.push(playlistId);
-                        existing.playlistNames.push(playlistName);
+                    if (!existing.playlistIds.includes(playlist.id)) {
+                        existing.playlistIds.push(playlist.id);
+                        existing.playlistNames.push(playlist.name);
                     }
-                    if (itemCreatedAt && (!existing.createdAt || itemCreatedAt < existing.createdAt)) {
+                    if (
+                        itemCreatedAt &&
+                        (!existing.createdAt || itemCreatedAt < existing.createdAt)
+                    ) {
                         existing.createdAt = itemCreatedAt;
                     }
                 } else {
@@ -80,35 +70,22 @@ export function useMediaItems(locationId: string | undefined) {
                         title: item.title ?? undefined,
                         duration: item.duration ?? undefined,
                         createdAt: itemCreatedAt ?? undefined,
-                        playlistIds: [playlistId],
-                        playlistNames: [playlistName],
+                        playlistIds: [playlist.id],
+                        playlistNames: [playlist.name],
                         items: [itemRef],
                     });
                 }
             }
-        });
+        }
 
         return Array.from(map.values());
-    }, [playlistQueries, playlistIds, playlistNamesMap]);
-
-    const isLoading =
-        playlistsQuery.isLoading ||
-        playlistQueries.some((q) => q.isLoading);
-    const isRefetching =
-        playlistsQuery.isRefetching ||
-        playlistQueries.some((q) => q.isRefetching);
-    const error = playlistsQuery.error ?? playlistQueries.find((q) => q.error)?.error;
-
-    const refetch = async () => {
-        await playlistsQuery.refetch();
-        await Promise.all(playlistQueries.map((q) => q.refetch()));
-    };
+    }, [query.data]);
 
     return {
         data: mediaItems,
-        isLoading,
-        isRefetching,
-        error,
-        refetch,
+        isLoading: query.isLoading,
+        isRefetching: query.isRefetching,
+        error: query.error,
+        refetch: query.refetch,
     };
 }

@@ -10,7 +10,7 @@ export function getStatusBadgeClasses(status: string): {
         case 'online':
             return { bg: 'bg-approve', text: 'text-white' };
         case 'offline':
-            return { bg: 'bg-red-500', text: 'text-white' };
+            return { bg: 'bg-primary', text: 'text-white' };
         default:
             return { bg: 'bg-pending', text: 'text-white' };
     }

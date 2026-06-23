@@ -62,7 +62,7 @@ export function ConfirmModal({
                             }}
                             className={`flex-1 py-3 rounded-xl items-center active:opacity-90 ${
                                 confirmStyle === 'destructive'
-                                    ? 'bg-red-500'
+                                    ? 'bg-primary'
                                     : 'bg-zinc-700'
                             }`}
                         >

@@ -10,9 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.kaast.mobile",
       "buildNumber": "1"
     },
     "android": {
+      "package": "com.kaast.mobile",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -21,7 +23,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "output": "static",
@@ -59,7 +65,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#ef4444",
+          "color": "#DD2C2C",
           "sounds": []
         }
       ],
@@ -70,6 +76,21 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a8153e03-1206-42e4-b664-79584f6a62b5",
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a8153e03-1206-42e4-b664-79584f6a62b5"
+      }
+    },
+    "owner": "legendssoftware"
   }
 }

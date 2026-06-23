@@ -12,6 +12,7 @@ module.exports = {
       colors: {
         base: "hsl(0 0% 9%)",
         "base-warm": "hsl(0 5% 8%)",
+        // Keep in sync with lib/theme/colors.ts
         primary: "hsl(0 72% 52%)",
         "primary-muted": "hsl(0 50% 40%)",
         cancel: "hsl(0 72.2% 50.6%)",

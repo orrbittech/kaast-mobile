@@ -3,10 +3,10 @@ import { locationsApi, locationKeys, type Location } from '../api';
 
 export type { Location };
 
-export function useLocations(orgId: string | undefined) {
+export function useLocations(clerkOrgId: string | undefined) {
     return useQuery({
-        queryKey: locationKeys.list(orgId ?? ''),
-        queryFn: () => locationsApi.list(orgId!),
-        enabled: !!orgId,
+        queryKey: locationKeys.list(clerkOrgId ?? ''),
+        queryFn: ({ signal }) => locationsApi.list(clerkOrgId!, { signal }),
+        enabled: !!clerkOrgId,
     });
 }

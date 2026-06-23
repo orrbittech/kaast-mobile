@@ -13,8 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import {
-    useOrganizations,
-    useLocations,
+    useActiveOrgContext,
     useDevice,
     useUpdateDevice,
     useDeleteDevice,
@@ -23,9 +22,9 @@ import {
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
+import { colors } from '../../../lib/theme/colors';
 import { getStatusBadgeClasses } from '../../../lib/utils/device-status';
-
-/** Format date to readable string */
+import { isImageUrl, formatDurationShort } from '../../../lib/utils/media';
 function formatDate(iso?: string): string {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -47,24 +46,6 @@ function formatLastSeen(lastSeenAt?: string): string {
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 }
 
-/** Check if URL is an image (can be used as cover) */
-function isImageUrl(url: string): boolean {
-    try {
-        const ext = url.split('.').pop()?.toLowerCase() ?? '';
-        const path = url.toLowerCase();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || path.includes('image');
-    } catch {
-        return false;
-    }
-}
-
-/** Format seconds to mm:ss */
-function formatDuration(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
 /**
  * Device detail - full device info including media session.
  */
@@ -74,10 +55,7 @@ export default function DeviceDetailScreen() {
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
-    const { data: orgs } = useOrganizations();
-    const firstOrg = orgs?.[0];
-    const clerkOrgId = firstOrg?.clerkOrgId ?? firstOrg?.id;
-    const { data: locations } = useLocations(clerkOrgId);
+    const { clerkOrgId, locations } = useActiveOrgContext();
 
     const {
         data: device,
@@ -98,8 +76,7 @@ export default function DeviceDetailScreen() {
     const locationName =
         locations?.find((l) => l.id === device?.locationId)?.name ?? 'Unassigned';
 
-    const firstLocationId = locations?.[0]?.id;
-    const { data: playlists } = usePlaylists(firstLocationId ?? undefined);
+    const { data: playlists } = usePlaylists(clerkOrgId ?? undefined);
 
     const handleEdit = async () => {
         if (!device || !editName.trim()) return;
@@ -149,7 +126,7 @@ export default function DeviceDetailScreen() {
                 className="flex-1 bg-base justify-center items-center"
                 style={{ paddingTop: contentTopPadding }}
             >
-                <ActivityIndicator size="large" color="#ef4444" />
+                <ActivityIndicator size="large" color={colors.primaryHex} />
             </View>
         );
     }
@@ -185,7 +162,7 @@ export default function DeviceDetailScreen() {
                     <RefreshControl
                         refreshing={isRefetching}
                         onRefresh={() => refetch()}
-                        tintColor="#ef4444"
+                        tintColor={colors.primaryHex}
                     />
                 }
             >
@@ -219,7 +196,7 @@ export default function DeviceDetailScreen() {
                                     <Ionicons
                                         name="trash-outline"
                                         size={22}
-                                        color="#ef4444"
+                                        color={colors.primaryHex}
                                     />
                                 </Pressable>
                             </View>
@@ -344,8 +321,8 @@ export default function DeviceDetailScreen() {
                             <View className="flex-row justify-between">
                                 <Text className="text-zinc-500 text-sm">Position</Text>
                                 <Text className="font-sans-medium text-white text-sm">
-                                    {formatDuration(session.position)} /{' '}
-                                    {formatDuration(session.duration)}
+                                    {formatDurationShort(session.position)} /{' '}
+                                    {formatDurationShort(session.duration)}
                                 </Text>
                             </View>
                             {session.volume != null && (
@@ -451,7 +428,7 @@ export default function DeviceDetailScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel

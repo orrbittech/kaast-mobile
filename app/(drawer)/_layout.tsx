@@ -5,6 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { CustomDrawerContent } from '../../components/CustomDrawerContent';
 import { DetailHeaderLeft } from '../../components/DetailHeaderLeft';
 import { HeaderAvatar } from '../../components/HeaderAvatar';
+import { useActiveOrgContext } from '../../lib/hooks';
+
+function ActiveOrgPrefetch() {
+    useActiveOrgContext();
+    return null;
+}
 
 /**
  * Drawer layout - left-pull navigation for main app screens.
@@ -18,107 +24,110 @@ export default function DrawerLayout() {
     }
 
     return (
-        <Drawer
-            screenOptions={{
-                drawerPosition: 'left',
-                drawerType: 'front',
-                headerShown: true,
-                headerTitle: () => null,
-                headerLeft: () => <DetailHeaderLeft />,
-                headerRight: () => <HeaderAvatar />,
-                swipeEnabled: true,
-                headerTransparent: true,
-                headerStyle: { backgroundColor: 'transparent' },
-                headerTintColor: '#ffffff',
-                headerTitleStyle: { fontFamily: 'Urbanist_600SemiBold' },
-                headerBlurEffect: 'dark',
-                drawerStyle: { backgroundColor: '#171717' },
-                drawerActiveTintColor: '#ffffff',
-                drawerInactiveTintColor: '#e4e4e7',
-                drawerLabelStyle: { fontFamily: 'Urbanist_500Medium' },
-                overlayColor: 'rgba(0,0,0,0.5)',
-                drawerContent: (props) => <CustomDrawerContent {...props} />,
-            }}
-        >
-            <Drawer.Screen
-                name="index"
-                options={{
-                    drawerLabel: 'Home',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons
-                            name="home-outline"
-                            size={size}
-                            color={color}
-                        />
-                    ),
+        <>
+            <ActiveOrgPrefetch />
+            <Drawer
+                screenOptions={{
+                    drawerPosition: 'left',
+                    drawerType: 'front',
+                    headerShown: true,
+                    headerTitle: () => null,
+                    headerLeft: () => <DetailHeaderLeft />,
+                    headerRight: () => <HeaderAvatar />,
+                    swipeEnabled: true,
+                    headerTransparent: true,
+                    headerStyle: { backgroundColor: 'transparent' },
+                    headerTintColor: '#ffffff',
+                    headerTitleStyle: { fontFamily: 'Urbanist_600SemiBold' },
+                    headerBlurEffect: 'dark',
+                    drawerStyle: { backgroundColor: '#171717' },
+                    drawerActiveTintColor: '#ffffff',
+                    drawerInactiveTintColor: '#e4e4e7',
+                    drawerLabelStyle: { fontFamily: 'Urbanist_500Medium' },
+                    overlayColor: 'rgba(0,0,0,0.5)',
+                    drawerContent: (props) => <CustomDrawerContent {...props} />,
                 }}
-            />
-            <Drawer.Screen
-                name="devices"
-                options={{
-                    drawerLabel: 'Devices',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons
-                            name="phone-portrait-outline"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
-            <Drawer.Screen
-                name="media"
-                options={{
-                    drawerLabel: 'Media',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons
-                            name="play-circle-outline"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
-            <Drawer.Screen
-                name="playlists"
-                options={{
-                    drawerLabel: 'Playlists',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons
-                            name="list-outline"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
-            <Drawer.Screen
-                name="profile"
-                options={{
-                    drawerLabel: 'Profile',
-                    drawerItemStyle: { display: 'none' },
-                }}
-            />
-            <Drawer.Screen
-                name="settings"
-                options={{
-                    drawerLabel: 'Settings',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons
-                            name="settings-outline"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
-            <Drawer.Screen
-                name="control/[deviceId]"
-                options={{
-                    drawerLabel: 'Control',
-                    drawerItemStyle: { display: 'none' },
-                }}
-            />
-        </Drawer>
+            >
+                <Drawer.Screen
+                    name="index"
+                    options={{
+                        drawerLabel: 'Home',
+                        drawerIcon: ({ color, size }) => (
+                            <Ionicons
+                                name="home-outline"
+                                size={size}
+                                color={color}
+                            />
+                        ),
+                    }}
+                />
+                <Drawer.Screen
+                    name="devices"
+                    options={{
+                        drawerLabel: 'Devices',
+                        drawerIcon: ({ color, size }) => (
+                            <Ionicons
+                                name="phone-portrait-outline"
+                                size={size}
+                                color={color}
+                            />
+                        ),
+                    }}
+                />
+                <Drawer.Screen
+                    name="media"
+                    options={{
+                        drawerLabel: 'Media',
+                        drawerIcon: ({ color, size }) => (
+                            <Ionicons
+                                name="play-circle-outline"
+                                size={size}
+                                color={color}
+                            />
+                        ),
+                    }}
+                />
+                <Drawer.Screen
+                    name="playlists"
+                    options={{
+                        drawerLabel: 'Playlists',
+                        drawerIcon: ({ color, size }) => (
+                            <Ionicons
+                                name="list-outline"
+                                size={size}
+                                color={color}
+                            />
+                        ),
+                    }}
+                />
+                <Drawer.Screen
+                    name="profile"
+                    options={{
+                        drawerLabel: 'Profile',
+                        drawerItemStyle: { display: 'none' },
+                    }}
+                />
+                <Drawer.Screen
+                    name="settings"
+                    options={{
+                        drawerLabel: 'Settings',
+                        drawerIcon: ({ color, size }) => (
+                            <Ionicons
+                                name="settings-outline"
+                                size={size}
+                                color={color}
+                            />
+                        ),
+                    }}
+                />
+                <Drawer.Screen
+                    name="control/[deviceId]"
+                    options={{
+                        drawerLabel: 'Control',
+                        drawerItemStyle: { display: 'none' },
+                    }}
+                />
+            </Drawer>
+        </>
     );
 }

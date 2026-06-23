@@ -2,6 +2,7 @@ import { View, Pressable } from 'react-native';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './ui/Text';
+import { colors } from '../lib/theme/colors';
 import { getStatusBadgeClasses } from '../lib/utils/device-status';
 import type { Device } from '../lib/api';
 
@@ -90,7 +91,7 @@ export function DeviceCard({
                                     <Ionicons
                                         name="trash-outline"
                                         size={20}
-                                        color="#ef4444"
+                                        color={colors.primaryHex}
                                     />
                                 </Pressable>
                             )}
@@ -123,7 +124,7 @@ export function DeviceCard({
                         <Ionicons
                             name="chevron-forward"
                             size={22}
-                            color="#ef4444"
+                            color={colors.primaryHex}
                         />
                     </Pressable>
                 </Link>

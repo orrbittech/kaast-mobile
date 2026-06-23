@@ -16,11 +16,11 @@ import { showSuccessNotification } from '../notifications/successNotification';
 export type { Device };
 
 /** List all devices for an organization. Refetches on app focus and uses 30s stale time. */
-export function useDevices(orgId: string | undefined) {
+export function useDevices(clerkOrgId: string | undefined) {
     return useQuery({
-        queryKey: deviceKeys.list(orgId ?? ''),
-        queryFn: () => devicesApi.list(orgId),
-        enabled: !!orgId,
+        queryKey: deviceKeys.list(clerkOrgId ?? ''),
+        queryFn: ({ signal }) => devicesApi.list(clerkOrgId, { signal }),
+        enabled: !!clerkOrgId,
         staleTime: 30_000,
         refetchOnWindowFocus: true,
     });
@@ -30,33 +30,32 @@ export function useDevices(orgId: string | undefined) {
 export function useDevice(id: string | undefined) {
     return useQuery({
         queryKey: deviceKeys.detail(id ?? ''),
-        queryFn: () => devicesApi.getById(id!),
+        queryFn: ({ signal }) => devicesApi.getById(id!, { signal }),
         enabled: !!id,
         staleTime: 15_000,
         refetchOnWindowFocus: true,
     });
 }
 
-/** Create device. Org from token. Pass orgId for org-scoped JWT. Invalidates all device queries. */
-export function useCreateDevice(orgId: string | undefined) {
+/** Create device. Org from token. Pass clerkOrgId for org-scoped JWT. */
+export function useCreateDevice(clerkOrgId: string | undefined) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (body: CreateDevice) => devicesApi.create(body, orgId),
+        mutationFn: (body: CreateDevice) => devicesApi.create(body, clerkOrgId),
         onSuccess: (data) => {
-            if (orgId) {
-                queryClient.setQueryData(deviceKeys.list(orgId), (old: Device[] | undefined) =>
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
                     old ? [...old, data] : [data],
                 );
             }
-            queryClient.invalidateQueries({ queryKey: deviceKeys.all });
             showSuccessNotification('Device created', data.name);
         },
     });
 }
 
-/** Update device. Optimistically updates list, invalidates all device queries. */
-export function useUpdateDevice(orgId: string | undefined) {
+/** Update device. Optimistically updates list cache. */
+export function useUpdateDevice(clerkOrgId: string | undefined) {
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -68,54 +67,52 @@ export function useUpdateDevice(orgId: string | undefined) {
             body: Partial<{ name: string; status: string; locationId: string | null; activePlaylistId: string | null }>;
         }) => devicesApi.update(id, body),
         onSuccess: (data, variables) => {
-            if (orgId) {
-                queryClient.setQueryData(deviceKeys.list(orgId), (old: Device[] | undefined) =>
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
                     old
                         ? old.map((d) => (d.id === variables.id ? { ...d, ...data } : d))
                         : [],
                 );
             }
-            queryClient.invalidateQueries({ queryKey: deviceKeys.all });
+            queryClient.setQueryData(deviceKeys.detail(variables.id), (old: Device | undefined) =>
+                old ? { ...old, ...data } : old,
+            );
             showSuccessNotification('Device updated', data.name);
         },
     });
 }
 
-/** Delete device. Optimistically removes from list, removes detail, invalidates all device queries. */
-export function useDeleteDevice(orgId: string | undefined) {
+/** Delete device. Optimistically removes from list and detail cache. */
+export function useDeleteDevice(clerkOrgId: string | undefined) {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: (id: string) => devicesApi.delete(id),
         onSuccess: (_, id) => {
             queryClient.removeQueries({ queryKey: deviceKeys.detail(id) });
-            if (orgId) {
-                queryClient.setQueryData(deviceKeys.list(orgId), (old: Device[] | undefined) =>
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
                     old ? old.filter((d) => d.id !== id) : [],
                 );
             }
-            queryClient.invalidateQueries({ queryKey: deviceKeys.all });
             showSuccessNotification('Device deleted');
         },
     });
 }
 
-/** Pair device with 6-digit code. Org from token. Pass orgId for org-scoped JWT. Invalidates device and location queries. */
-export function usePairDevice(orgId: string | undefined) {
+/** Pair device with 6-digit code. Org from token. */
+export function usePairDevice(clerkOrgId: string | undefined) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (body: PairDevice) => devicesApi.pair(body, orgId),
+        mutationFn: (body: PairDevice) => devicesApi.pair(body, clerkOrgId),
         onSuccess: (data) => {
-            if (orgId) {
-                queryClient.setQueryData(deviceKeys.list(orgId), (old: Device[] | undefined) =>
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
                     old ? [...old, data.device] : [data.device],
                 );
-            }
-            queryClient.invalidateQueries({ queryKey: deviceKeys.all });
-            if (orgId) {
-                queryClient.invalidateQueries({
-                    queryKey: locationKeys.list(orgId),
+                void queryClient.invalidateQueries({
+                    queryKey: locationKeys.list(clerkOrgId),
                 });
             }
             showSuccessNotification('Device paired', data.device.name);
@@ -123,7 +120,7 @@ export function usePairDevice(orgId: string | undefined) {
     });
 }
 
-/** Generate pairing code for TV device. No cache invalidation. */
+/** Generate pairing code for TV device. */
 export function useGeneratePairingCode() {
     return useMutation({
         mutationFn: (deviceId: string) =>

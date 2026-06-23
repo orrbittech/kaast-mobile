@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useClerk } from '@clerk/clerk-expo';
+import { invalidateOnSignOut } from '../lib/api/invalidate';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { Text } from './ui/Text';
@@ -23,6 +24,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         '—';
 
     const onSignOut = async () => {
+        invalidateOnSignOut();
         await signOut();
         router.replace('/sign-in');
     };

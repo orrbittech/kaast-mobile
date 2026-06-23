@@ -1,4 +1,5 @@
 import { apiClient, type ApiRequestConfig } from '../client';
+import type { ApiRequestOptions } from '../request-config';
 import type {
     Device,
     DeviceWithMediaSession,
@@ -9,7 +10,6 @@ import type {
 } from '../types';
 
 export const devicesApi = {
-    /** POST /devices/pairing-code - Generate 6-digit pairing code for TV device (no auth) */
     generatePairingCode: async (
         deviceId: string,
     ): Promise<GeneratePairingCodeResponse> => {
@@ -20,39 +20,41 @@ export const devicesApi = {
         return data;
     },
 
-    /** GET /devices - List all devices for organization. Pass organizationId for org-scoped JWT. */
-    list: async (organizationId?: string): Promise<Device[]> => {
-        if (!organizationId || organizationId === 'undefined' || organizationId === 'null') {
+    list: async (
+        clerkOrgId?: string,
+        options?: ApiRequestOptions,
+    ): Promise<Device[]> => {
+        if (!clerkOrgId || clerkOrgId === 'undefined' || clerkOrgId === 'null') {
             return [];
         }
-        const config = { organizationId } as ApiRequestConfig;
+        const config = { clerkOrgId, signal: options?.signal } as ApiRequestConfig & ApiRequestOptions;
         const { data } = await apiClient.get<Device[]>('/devices', config);
         return data;
     },
 
-    /** POST /devices - Create device. Org from token (pass organizationId for org-scoped JWT). */
-    create: async (body: CreateDevice, organizationId?: string): Promise<Device> => {
-        const config: ApiRequestConfig = organizationId ? { organizationId } : {};
+    create: async (body: CreateDevice, clerkOrgId?: string): Promise<Device> => {
+        const config: ApiRequestConfig = clerkOrgId ? { clerkOrgId } : {};
         const { data } = await apiClient.post<Device>('/devices', body, config as Parameters<typeof apiClient.post>[2]);
         return data;
     },
 
-    /** POST /devices/pair - Pair device to org/location (pass organizationId for org-scoped JWT). */
-    pair: async (body: PairDevice, organizationId?: string): Promise<PairDeviceResponse> => {
-        const config: ApiRequestConfig = organizationId ? { organizationId } : {};
+    pair: async (body: PairDevice, clerkOrgId?: string): Promise<PairDeviceResponse> => {
+        const config: ApiRequestConfig = clerkOrgId ? { clerkOrgId } : {};
         const { data } = await apiClient.post<PairDeviceResponse>('/devices/pair', body, config as Parameters<typeof apiClient.post>[2]);
         return data;
     },
 
-    /** GET /devices/:id - Get device by ID */
-    getById: async (id: string): Promise<DeviceWithMediaSession> => {
+    getById: async (
+        id: string,
+        options?: ApiRequestOptions,
+    ): Promise<DeviceWithMediaSession> => {
         const { data } = await apiClient.get<DeviceWithMediaSession>(
             `/devices/${id}`,
+            { signal: options?.signal },
         );
         return data;
     },
 
-    /** PATCH /devices/:id - Update device */
     update: async (
         id: string,
         body: Partial<{ name: string; status: string; locationId: string | null; activePlaylistId: string | null }>,
@@ -61,7 +63,6 @@ export const devicesApi = {
         return data;
     },
 
-    /** DELETE /devices/:id - Delete device */
     delete: async (id: string): Promise<{ deleted: boolean }> => {
         const { data } = await apiClient.delete<{ deleted: boolean }>(
             `/devices/${id}`,

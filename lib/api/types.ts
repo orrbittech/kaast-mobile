@@ -7,15 +7,6 @@ export interface UserProfile {
     imageUrl?: string;
 }
 
-/** Organization from GET /orgs */
-export interface Organization {
-    id: string;
-    clerkOrgId: string;
-    name: string;
-    slug?: string;
-    role: string;
-}
-
 /** Location from locations API */
 export interface Location {
     id: string;
@@ -46,6 +37,7 @@ export interface DeviceWithMediaSession extends Device {
         duration: number;
         playing: boolean;
         volume?: number | null;
+        snapshotData?: string | null;
     } | null;
     activePlaylist?: { id: string; name: string } | null;
 }
@@ -64,6 +56,8 @@ export interface MediaSession {
     duration: number;
     playing: boolean;
     volume?: number | null;
+    snapshotData?: string | null;
+    updatedAt?: string;
 }
 
 /** Create device request body */
@@ -94,7 +88,8 @@ export interface MediaCommand {
 export interface Playlist {
     id: string;
     name: string;
-    locationId: string;
+    locationId?: string | null;
+    clerkOrgId?: string;
     createdAt?: string;
     updatedAt?: string;
     items?: PlaylistItem[];
@@ -114,7 +109,6 @@ export interface PlaylistItem {
 /** Create playlist request body */
 export interface CreatePlaylist {
     name: string;
-    locationId: string;
 }
 
 /** Update playlist request body */

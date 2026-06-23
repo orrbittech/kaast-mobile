@@ -1,4 +1,5 @@
-import { View, Pressable, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
@@ -7,28 +8,33 @@ import {
     Play,
     Pause,
     SkipForward,
+    Volume1,
     Volume2,
-    VolumeX,
 } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useDevice, useMediaSession } from '../../../lib/hooks';
+import { useDevice, useMediaSession, useSendMediaCommand } from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
+import { RemoteControlButton } from '../../../components/RemoteControlButton';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
+import { colors } from '../../../lib/theme/colors';
+import { isImageUrl } from '../../../lib/utils/media';
+import { mediaControlSocket } from '../../../lib/ws/media-control-socket';
+import type { MediaSession } from '../../../lib/api/types';
 
-/** Check if URL is an image (can be used as cover) */
-function isImageUrl(url: string): boolean {
-    try {
-        const ext = url.split('.').pop()?.toLowerCase() ?? '';
-        const path = url.toLowerCase();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || path.includes('image');
-    } catch {
-        return false;
+const VOLUME_STEP = 0.1;
+
+function getPreviewUri(session: MediaSession | null | undefined): string | null {
+    if (session?.snapshotData) {
+        return `data:image/jpeg;base64,${session.snapshotData}`;
     }
+    if (session?.mediaUrl && isImageUrl(session.mediaUrl)) {
+        return session.mediaUrl;
+    }
+    return null;
 }
 
 /**
  * Media control UI - remote-like layout with play/pause/seek/volume controls.
- * Media preview container above the control section.
  */
 export default function ControlScreen() {
     const insets = useSafeAreaInsets();
@@ -38,7 +44,35 @@ export default function ControlScreen() {
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
     const { data: device, isLoading, error } = useDevice(deviceIdParam);
-    const { data: session } = useMediaSession(device?.deviceId);
+    const sendCommand = useSendMediaCommand(device?.deviceId);
+    const embeddedSession = device?.mediaSession;
+    const { data: polledSession } = useMediaSession(device?.deviceId);
+    const [liveSession, setLiveSession] = useState<MediaSession | null>(null);
+    const [optimisticVolume, setOptimisticVolume] = useState<number | null>(null);
+
+    const session = liveSession ?? polledSession ?? embeddedSession ?? null;
+    const volume = optimisticVolume ?? session?.volume ?? 1;
+
+    useEffect(() => {
+        if (!device?.deviceId) return;
+
+        void mediaControlSocket.connect(device.deviceId);
+        const unsub = mediaControlSocket.onSessionState((next) => {
+            setLiveSession(next);
+            setOptimisticVolume(null);
+        });
+
+        return () => {
+            unsub();
+            mediaControlSocket.disconnect();
+        };
+    }, [device?.deviceId]);
+
+    useEffect(() => {
+        if (polledSession?.volume != null && optimisticVolume == null) {
+            setLiveSession((prev) => ({ ...(prev ?? polledSession), ...polledSession }));
+        }
+    }, [polledSession, optimisticVolume]);
 
     if (isLoading) {
         return (
@@ -46,7 +80,7 @@ export default function ControlScreen() {
                 className="flex-1 bg-base justify-center items-center"
                 style={{ paddingTop: contentTopPadding }}
             >
-                <ActivityIndicator size="large" color="#ef4444" />
+                <ActivityIndicator size="large" color={colors.primaryHex} />
             </View>
         );
     }
@@ -64,8 +98,41 @@ export default function ControlScreen() {
         );
     }
 
-    const mediaUrl = session?.mediaUrl;
-    const showMediaPreview = Boolean(mediaUrl);
+    const previewUri = getPreviewUri(session);
+    const position = session?.position ?? 0;
+    const duration = session?.duration ?? 0;
+
+    const handlePlayPause = () => {
+        if (!device?.deviceId) return;
+        sendCommand.mutate({
+            command: session?.playing ? 'pause' : 'play',
+        });
+    };
+
+    const handleSeek = (nextPosition: number) => {
+        if (!device?.deviceId) return;
+        sendCommand.mutate({
+            command: 'seek',
+            payload: { position: Math.max(0, nextPosition) },
+        });
+    };
+
+    const handleVolumeChange = (delta: number) => {
+        if (!device?.deviceId) return;
+        const nextVolume = Math.min(1, Math.max(0, volume + delta));
+        setOptimisticVolume(nextVolume);
+        if (mediaControlSocket.isConnected()) {
+            mediaControlSocket.sendCommand({
+                command: 'volume',
+                payload: { volume: nextVolume },
+            });
+            return;
+        }
+        sendCommand.mutate({
+            command: 'volume',
+            payload: { volume: nextVolume },
+        });
+    };
 
     return (
         <View
@@ -73,73 +140,72 @@ export default function ControlScreen() {
             style={{ paddingTop: contentTopPadding }}
         >
             <View className="flex-1 px-6">
-                {/* Media preview container */}
                 <View className="rounded-2xl bg-zinc-800 overflow-hidden mb-6">
                     <View className="h-48 bg-zinc-700/60">
-                        {showMediaPreview && isImageUrl(mediaUrl!) ? (
+                        {previewUri ? (
                             <Image
-                                source={{ uri: mediaUrl! }}
-                                className="w-full h-full"
+                                source={{ uri: previewUri }}
+                                style={{ width: '100%', height: '100%' }}
                                 contentFit="cover"
                             />
-                        ) : showMediaPreview ? (
-                            <View className="flex-1 items-center justify-center">
-                                <Ionicons name="videocam-outline" size={64} color="#71717a" />
-                                <Text className="text-zinc-500 text-sm mt-2">Video playing</Text>
-                            </View>
                         ) : (
                             <View className="flex-1 items-center justify-center">
-                                <View className="w-20 h-20 rounded-full bg-primary/20 items-center justify-center">
-                                    <Play size={40} color="#ef4444" fill="#ef4444" />
-                                </View>
-                                <Text className="text-zinc-500 text-sm mt-3">No media playing</Text>
+                                <Ionicons
+                                    name="play-circle-outline"
+                                    size={64}
+                                    color={colors.primaryHex}
+                                />
                             </View>
                         )}
                     </View>
                 </View>
 
-                {/* Title */}
                 <Text className="text-xl font-sans-semibold text-white text-center mb-2">
-                    Control: {device.name}
+                    {device.name}
                 </Text>
                 <Text className="text-zinc-400 text-center mb-8">
-                    Media control UI - WebSocket integration pending
+                    {session?.playing ? 'Playing' : 'Paused'}
                 </Text>
 
-                {/* Remote-like controls */}
-                <View className="gap-6 items-center">
-                    {/* Playback row */}
-                    <View className="flex-row gap-4 justify-center items-center">
-                        <Pressable className="w-14 h-14 rounded-full bg-zinc-700 items-center justify-center active:opacity-80">
-                            <SkipBack size={24} color="#ffffff" />
-                        </Pressable>
-                        <Pressable className="w-20 h-20 rounded-full bg-primary items-center justify-center active:opacity-90">
-                            {session?.playing ? (
-                                <Pause size={32} color="#ffffff" fill="#ffffff" />
-                            ) : (
-                                <Play size={32} color="#ffffff" fill="#ffffff" />
-                            )}
-                        </Pressable>
-                        <Pressable className="w-14 h-14 rounded-full bg-zinc-700 items-center justify-center active:opacity-80">
-                            <SkipForward size={24} color="#ffffff" />
-                        </Pressable>
-                    </View>
+                <View className="flex-row items-center justify-center gap-8 mt-4">
+                    <RemoteControlButton
+                        onPress={() => handleSeek(Math.max(0, position - 10))}
+                        disabled={sendCommand.isPending}
+                    >
+                        <SkipBack size={28} color="#fff" />
+                    </RemoteControlButton>
+                    <RemoteControlButton
+                        size="lg"
+                        onPress={handlePlayPause}
+                        disabled={sendCommand.isPending}
+                    >
+                        {session?.playing ? (
+                            <Pause size={32} color="#fff" />
+                        ) : (
+                            <Play size={32} color="#fff" />
+                        )}
+                    </RemoteControlButton>
+                    <RemoteControlButton
+                        onPress={() =>
+                            handleSeek(
+                                duration > 0
+                                    ? Math.min(duration, position + 10)
+                                    : position + 10,
+                            )
+                        }
+                        disabled={sendCommand.isPending}
+                    >
+                        <SkipForward size={28} color="#fff" />
+                    </RemoteControlButton>
+                </View>
 
-                    {/* Volume row */}
-                    <View className="flex-row gap-4 justify-center items-center">
-                        <Pressable className="w-14 h-14 rounded-full bg-zinc-700 items-center justify-center active:opacity-80">
-                            <VolumeX size={24} color="#ffffff" />
-                        </Pressable>
-                        <Pressable className="px-8 py-3 rounded-xl bg-zinc-700 active:opacity-80">
-                            <Text className="font-sans-medium text-white">Vol -</Text>
-                        </Pressable>
-                        <Pressable className="px-8 py-3 rounded-xl bg-zinc-700 active:opacity-80">
-                            <Text className="font-sans-medium text-white">Vol +</Text>
-                        </Pressable>
-                        <Pressable className="w-14 h-14 rounded-full bg-zinc-700 items-center justify-center active:opacity-80">
-                            <Volume2 size={24} color="#ffffff" />
-                        </Pressable>
-                    </View>
+                <View className="flex-row items-center justify-center gap-8 mt-4">
+                    <RemoteControlButton onPress={() => handleVolumeChange(-VOLUME_STEP)}>
+                        <Volume1 size={24} color="#fff" />
+                    </RemoteControlButton>
+                    <RemoteControlButton onPress={() => handleVolumeChange(VOLUME_STEP)}>
+                        <Volume2 size={24} color="#fff" />
+                    </RemoteControlButton>
                 </View>
             </View>
         </View>

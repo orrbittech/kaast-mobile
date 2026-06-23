@@ -7,7 +7,6 @@ export {
 export { isApiError, getUserFriendlyMessage, getErrorCode } from './errors';
 export type {
     UserProfile,
-    Organization,
     Location,
     Device,
     DeviceWithMediaSession,
@@ -25,10 +24,22 @@ export type {
     CreatePlaylistItem,
     UpdatePlaylistItem,
 } from './types';
-export { deviceKeys, locationKeys, playlistKeys } from './query-keys';
+export {
+    deviceKeys,
+    locationKeys,
+    playlistKeys,
+    userKeys,
+    mediaSessionKeys,
+} from './query-keys';
+export { queryClient, clearAppCache } from './query-client';
+export {
+    invalidateDevices,
+    invalidatePlaylists,
+    invalidateAfterPair,
+    invalidateOnSignOut,
+} from './invalidate';
 export {
     usersApi,
-    organizationsApi,
     locationsApi,
     devicesApi,
     mediaApi,

@@ -4,7 +4,9 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Play, ChevronRight } from 'lucide-react-native';
 import { Text } from './ui/Text';
+import { colors } from '../lib/theme/colors';
 import type { Playlist, PlaylistItem } from '../lib/api';
+import { isImageUrl, getDisplayTitle } from '../lib/utils/media';
 
 interface PlaylistCardProps {
     playlist: Playlist;
@@ -16,23 +18,7 @@ interface PlaylistCardProps {
 /** Derive display title from item URL or title */
 function getItemTitle(item: PlaylistItem): string {
     if (item.title?.trim()) return item.title;
-    try {
-        const pathname = new URL(item.mediaUrl).pathname;
-        return pathname.split('/').pop() ?? item.mediaUrl;
-    } catch {
-        return item.mediaUrl;
-    }
-}
-
-/** Check if URL is an image (can be used as cover) */
-function isImageUrl(url: string): boolean {
-    try {
-        const ext = url.split('.').pop()?.toLowerCase() ?? '';
-        const path = url.toLowerCase();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || path.includes('image');
-    } catch {
-        return false;
-    }
+    return getDisplayTitle({ mediaUrl: item.mediaUrl, title: item.title ?? undefined });
 }
 
 /**
@@ -66,7 +52,7 @@ export function PlaylistCard({
                 ) : (
                     <View className="flex-1 items-center justify-center bg-zinc-700/80">
                         <View className="w-14 h-14 rounded-full bg-primary/20 items-center justify-center">
-                            <Play size={28} color="#ef4444" fill="#ef4444" />
+                            <Play size={28} color={colors.primaryHex} fill={colors.primaryHex} />
                         </View>
                     </View>
                 )}
@@ -91,7 +77,7 @@ export function PlaylistCard({
                 </View>
                 <View className="flex-row items-center mb-2">
                     <View className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center mr-3">
-                        <Play size={20} color="#ef4444" fill="#ef4444" />
+                        <Play size={20} color={colors.primaryHex} fill={colors.primaryHex} />
                     </View>
                     <Text className="font-sans-semibold text-white text-base flex-1">
                         {playlist.name}

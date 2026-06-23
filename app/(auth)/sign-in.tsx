@@ -6,6 +6,7 @@ import { useSignIn } from '@clerk/clerk-expo';
 import { useLocalCredentials } from '@clerk/clerk-expo/local-credentials';
 import type { EmailCodeFactor } from '@clerk/types';
 import { Text } from '../../components/ui/Text';
+import { colors } from '../../lib/theme/colors';
 import { AppleSignInButton } from '../../components/AppleSignInButton';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 
@@ -162,9 +163,9 @@ export default function SignInScreen() {
             <View className="flex-1 bg-base justify-center items-center px-6">
                 <Pressable
                     onPress={() => router.replace('/(onboarding)')}
-                    className="absolute top-16 left-6 z-10 p-2 -m-2 rounded-full bg-red-500/10 border border-red-500"
+                    className="absolute top-16 left-6 z-10 p-2 -m-2 rounded-full bg-primary/10 border border-primary"
                 >
-                    <Ionicons name="arrow-back" size={24} color="#ef4444" />
+                    <Ionicons name="arrow-back" size={24} color={colors.primaryHex} />
                 </Pressable>
                 <View className="w-full max-w-md gap-4">
                     <Text className="text-2xl font-sans-semibold text-white">
@@ -203,9 +204,9 @@ export default function SignInScreen() {
         <View className="flex-1 bg-base justify-center items-center px-6">
             <Pressable
                 onPress={() => router.replace('/(onboarding)')}
-                className="absolute top-16 left-6 z-10 p-2 -m-2 rounded-full bg-red-500/10 border border-red-500"
+                className="absolute top-16 left-6 z-10 p-2 -m-2 rounded-full bg-primary/10 border border-primary"
             >
-                <Ionicons name="arrow-back" size={24} color="#ef4444" />
+                <Ionicons name="arrow-back" size={24} color={colors.primaryHex} />
             </Pressable>
             <View className="w-full max-w-md gap-4">
                 <Text className="text-2xl font-sans-semibold text-white">

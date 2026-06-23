@@ -14,8 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-    useOrganizations,
-    useLocations,
+    useActiveOrgContext,
     useDevices,
     usePlaylists,
     useMediaItems,
@@ -28,6 +27,7 @@ import { ConfirmModal } from '../../../components/ConfirmModal';
 import { PlaylistCard } from '../../../components/PlaylistCard';
 import { MediaListItem } from '../../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
+import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
 
 /**
@@ -37,12 +37,7 @@ export default function PlaylistsScreen() {
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
 
-    const { data: orgs } = useOrganizations();
-    const firstOrg = orgs?.[0];
-    const clerkOrgId = firstOrg?.clerkOrgId ?? firstOrg?.id;
-    const { data: locations } = useLocations(clerkOrgId);
-    const firstLocationId = locations?.[0]?.id;
-    const firstLocationName = locations?.[0]?.name ?? 'Unknown';
+    const { clerkOrgId, org: firstOrg } = useActiveOrgContext();
 
     const { data: devices } = useDevices(clerkOrgId);
     const {
@@ -51,11 +46,11 @@ export default function PlaylistsScreen() {
         error,
         refetch,
         isRefetching,
-    } = usePlaylists(firstLocationId);
-    const { data: mediaItems } = useMediaItems(firstLocationId);
-    const createPlaylist = useCreatePlaylist();
-    const updatePlaylist = useUpdatePlaylist(firstLocationId);
-    const deletePlaylist = useDeletePlaylist(firstLocationId);
+    } = usePlaylists(clerkOrgId);
+    const { data: mediaItems } = useMediaItems(clerkOrgId);
+    const createPlaylist = useCreatePlaylist(clerkOrgId);
+    const updatePlaylist = useUpdatePlaylist(clerkOrgId);
+    const deletePlaylist = useDeletePlaylist(clerkOrgId);
 
     const [createModalVisible, setCreateModalVisible] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
@@ -115,11 +110,10 @@ export default function PlaylistsScreen() {
         : [];
 
     const handleCreate = async () => {
-        if (!createName.trim() || !firstLocationId) return;
+        if (!createName.trim()) return;
         try {
             await createPlaylist.mutateAsync({
                 name: createName.trim(),
-                locationId: firstLocationId,
             });
             setCreateModalVisible(false);
             setCreateName('');
@@ -176,7 +170,7 @@ export default function PlaylistsScreen() {
                     <RefreshControl
                         refreshing={isRefetching && !isLoading}
                         onRefresh={() => refetch()}
-                        tintColor="#ef4444"
+                        tintColor={colors.primaryHex}
                     />
                 }
             >
@@ -232,13 +226,11 @@ export default function PlaylistsScreen() {
                         </Pressable>
                         <Pressable
                             onPress={() =>
-                                firstOrg &&
-                                firstLocationId &&
-                                setCreateModalVisible(true)
+                                firstOrg && setCreateModalVisible(true)
                             }
-                            disabled={!firstOrg || !firstLocationId}
+                            disabled={!firstOrg}
                             className={`w-10 h-10 rounded-xl items-center justify-center ${
-                                firstOrg && firstLocationId
+                                firstOrg
                                     ? 'bg-approve active:opacity-90'
                                     : 'bg-zinc-800 opacity-50'
                             }`}
@@ -259,7 +251,7 @@ export default function PlaylistsScreen() {
 
                 {isLoading && (
                     <View className="py-12 items-center">
-                        <ActivityIndicator size="large" color="#ef4444" />
+                        <ActivityIndicator size="large" color={colors.primaryHex} />
                     </View>
                 )}
 
@@ -279,15 +271,7 @@ export default function PlaylistsScreen() {
                     </View>
                 )}
 
-                {firstOrg && !firstLocationId && !isLoading && (
-                    <View className="py-12 items-center">
-                        <Text className="text-zinc-400 text-center">
-                            Create a location to view playlists.
-                        </Text>
-                    </View>
-                )}
-
-                {!isLoading && !error && playlists && firstLocationId && (
+                {!isLoading && !error && playlists && firstOrg && (
                     <View className="gap-4">
                         {viewMode === 'card' ? (
                             filteredPlaylists.length === 0 ? (
@@ -316,7 +300,7 @@ export default function PlaylistsScreen() {
                                         key={playlist.id}
                                         playlist={playlist}
                                         itemCount={playlist.items?.length}
-                                        locationName={firstLocationName}
+                                        locationName={firstOrg?.name ?? 'Organization'}
                                         onMenuPress={() =>
                                             setMenuPlaylist({
                                                 id: playlist.id,
@@ -383,7 +367,7 @@ export default function PlaylistsScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setCreateModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -509,7 +493,7 @@ export default function PlaylistsScreen() {
                         </ScrollView>
                         <Pressable
                             onPress={() => setSearchModalVisible(false)}
-                            className="py-3 rounded-xl bg-red-500 items-center active:opacity-90"
+                            className="py-3 rounded-xl bg-primary items-center active:opacity-90"
                         >
                             <Text className="font-sans-medium text-white">
                                 Close
@@ -551,7 +535,7 @@ export default function PlaylistsScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -627,9 +611,9 @@ export default function PlaylistsScreen() {
                                 <Ionicons
                                     name="trash-outline"
                                     size={22}
-                                    color="#ef4444"
+                                    color={colors.primaryHex}
                                 />
-                                <Text className="font-sans-medium text-red-500">
+                                <Text className="font-sans-medium text-primary">
                                     Delete
                                 </Text>
                             </Pressable>

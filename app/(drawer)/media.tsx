@@ -14,13 +14,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-    useOrganizations,
-    useLocations,
+    useActiveOrgContext,
     useMediaItems,
     usePlaylists,
-    useAddPlaylistItem,
     useBatchUpdatePlaylistItems,
     useBatchRemovePlaylistItems,
+    useCreatePlaylist,
 } from '../../lib/hooks';
 import type { MediaItemDisplay } from '../../lib/hooks';
 import { Text } from '../../components/ui/Text';
@@ -28,33 +27,10 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { MediaCard } from '../../components/MediaCard';
 import { MediaListItem } from '../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
-import { getUserFriendlyMessage } from '../../lib/api';
-
-/** Derive display title from URL pathname or explicit title */
-function getDisplayTitle(item: MediaItemDisplay): string {
-    if (item.title?.trim()) return item.title;
-    try {
-        const pathname = new URL(item.mediaUrl).pathname;
-        const filename = pathname.split('/').pop();
-        return filename ?? item.mediaUrl;
-    } catch {
-        return item.mediaUrl;
-    }
-}
-
-/** Infer media type from URL for filtering (video, audio, image, or generic) */
-function getMediaTypeForFilter(mediaUrl: string): 'video' | 'audio' | 'image' | 'media' {
-    try {
-        const ext = mediaUrl.split('.').pop()?.toLowerCase() ?? '';
-        const path = mediaUrl.toLowerCase();
-        if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext) || path.includes('video')) return 'video';
-        if (['mp3', 'wav', 'ogg', 'm4a', 'aac'].includes(ext) || path.includes('audio')) return 'audio';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || path.includes('image')) return 'image';
-        return 'media';
-    } catch {
-        return 'media';
-    }
-}
+import { colors } from '../../lib/theme/colors';
+import { getUserFriendlyMessage, playlistsApi, invalidatePlaylists } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { getDisplayTitle, getMediaTypeForFilter } from '../../lib/utils/media';
 
 /**
  * Media page - browse media derived from playlist items.
@@ -63,13 +39,10 @@ function getMediaTypeForFilter(mediaUrl: string): 'video' | 'audio' | 'image' | 
 export default function MediaScreen() {
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
+    const queryClient = useQueryClient();
 
-    const { data: orgs } = useOrganizations();
-    const firstOrg = orgs?.[0];
-    const clerkOrgId = firstOrg?.clerkOrgId ?? firstOrg?.id;
-    const { data: locations } = useLocations(clerkOrgId);
-    const firstLocationId = locations?.[0]?.id;
-    const { data: playlists } = usePlaylists(firstLocationId);
+    const { clerkOrgId, org: firstOrg } = useActiveOrgContext();
+    const { data: playlists } = usePlaylists(clerkOrgId);
 
     const {
         data: mediaItems,
@@ -77,7 +50,7 @@ export default function MediaScreen() {
         error,
         refetch,
         isRefetching,
-    } = useMediaItems(firstLocationId);
+    } = useMediaItems(clerkOrgId);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [searchModalVisible, setSearchModalVisible] = useState(false);
@@ -95,15 +68,15 @@ export default function MediaScreen() {
     const [editUrl, setEditUrl] = useState('');
     const [confirmRemoveItem, setConfirmRemoveItem] = useState<MediaItemDisplay | null>(null);
 
-    const addItem = useAddPlaylistItem(selectedPlaylistId ?? undefined);
-    const batchUpdate = useBatchUpdatePlaylistItems();
-    const batchRemove = useBatchRemovePlaylistItems();
+    const batchUpdate = useBatchUpdatePlaylistItems(clerkOrgId);
+    const batchRemove = useBatchRemovePlaylistItems(clerkOrgId);
+    const createPlaylist = useCreatePlaylist(clerkOrgId);
 
     /** Filter media by type (video, audio, image) */
     const typeFilteredMediaItems = mediaItems
         ? mediaItems.filter((item) => {
               if (typeFilter === 'all') return true;
-              return getMediaTypeForFilter(item.mediaUrl) === typeFilter;
+              return getMediaTypeForFilter(item) === typeFilter;
           })
         : [];
 
@@ -165,17 +138,25 @@ export default function MediaScreen() {
     };
 
     const handleAddMedia = async () => {
-        const playlistId = selectedPlaylistId ?? playlists?.[0]?.id;
-        if (!addMediaUrl.trim() || !playlistId) return;
+        if (!addMediaUrl.trim()) return;
         try {
-            await addItem.mutateAsync({
+            let playlistId = selectedPlaylistId ?? playlists?.[0]?.id;
+            if (!playlistId) {
+                const created = await createPlaylist.mutateAsync({
+                    name: 'My Playlist',
+                });
+                playlistId = created.id;
+            }
+            await playlistsApi.addItem(playlistId, {
                 mediaUrl: addMediaUrl.trim(),
                 title: addTitle.trim() || undefined,
             });
+            invalidatePlaylists(queryClient, { clerkOrgId });
             setAddModalVisible(false);
             setAddMediaUrl('');
             setAddTitle('');
             setSelectedPlaylistId(null);
+            refetch();
         } catch {
             // Global NetworkErrorHandler shows error
         }
@@ -195,7 +176,7 @@ export default function MediaScreen() {
                     <RefreshControl
                         refreshing={isRefetching && !isLoading}
                         onRefresh={() => refetch()}
-                        tintColor="#ef4444"
+                        tintColor={colors.primaryHex}
                     />
                 }
             >
@@ -242,12 +223,10 @@ export default function MediaScreen() {
                             />
                         </Pressable>
                         <Pressable
-                            onPress={() =>
-                                firstOrg && firstLocationId && openAddModal()
-                            }
-                            disabled={!firstOrg || !firstLocationId}
+                            onPress={() => firstOrg && openAddModal()}
+                            disabled={!firstOrg}
                             className={`w-10 h-10 rounded-xl items-center justify-center ${
-                                firstOrg && firstLocationId
+                                firstOrg
                                     ? 'bg-approve active:opacity-90'
                                     : 'bg-zinc-800 opacity-50'
                             }`}
@@ -268,7 +247,7 @@ export default function MediaScreen() {
 
                 {isLoading && (
                     <View className="py-12 items-center">
-                        <ActivityIndicator size="large" color="#ef4444" />
+                        <ActivityIndicator size="large" color={colors.primaryHex} />
                     </View>
                 )}
 
@@ -288,15 +267,7 @@ export default function MediaScreen() {
                     </View>
                 )}
 
-                {firstOrg && !firstLocationId && !isLoading && (
-                    <View className="py-12 items-center">
-                        <Text className="text-zinc-400 text-center">
-                            Create a location to view media.
-                        </Text>
-                    </View>
-                )}
-
-                {!isLoading && !error && mediaItems && firstLocationId && (
+                {!isLoading && !error && mediaItems && firstOrg && (
                     <View className="gap-4">
                         {typeFilteredMediaItems.length === 0 ? (
                             <View className="py-12 items-center">
@@ -308,12 +279,7 @@ export default function MediaScreen() {
                                 {mediaItems.length === 0 && (
                                     <Pressable
                                         onPress={openAddModal}
-                                        disabled={!playlists?.length}
-                                        className={`py-3 px-6 rounded-xl ${
-                                            playlists?.length
-                                                ? 'bg-approve active:opacity-90'
-                                                : 'bg-zinc-700 opacity-50'
-                                        }`}
+                                        className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
                                     >
                                         <Text className="font-sans-medium text-white">
                                             Add Media to Playlist
@@ -402,7 +368,7 @@ export default function MediaScreen() {
                         </ScrollView>
                         <Pressable
                             onPress={() => setSearchModalVisible(false)}
-                            className="py-3 rounded-xl bg-red-500 items-center active:opacity-90"
+                            className="py-3 rounded-xl bg-primary items-center active:opacity-90"
                         >
                             <Text className="font-sans-medium text-white">
                                 Close
@@ -523,7 +489,7 @@ export default function MediaScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setAddModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -633,7 +599,7 @@ export default function MediaScreen() {
                                 onPress={() => handleRemoveMedia(editMediaItem)}
                                 className="py-3 rounded-xl items-center active:opacity-90"
                             >
-                                <Text className="font-sans-medium text-red-500">
+                                <Text className="font-sans-medium text-primary">
                                     Remove from all playlists
                                 </Text>
                             </Pressable>

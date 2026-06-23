@@ -13,7 +13,7 @@ export interface OnboardingSlide {
  */
 export const SLIDES: OnboardingSlide[] = [
     {
-        title: 'Take charge. Manage every screen from your fingertips',
+        title: 'Take charge. Control every screen from your fingertips',
         highlight: 'KAAST -',
     },
     { title: 'Keep your brand locked in across every display' },

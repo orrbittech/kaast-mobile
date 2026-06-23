@@ -1,47 +1,49 @@
 import { apiClient } from '../client';
+import type { ApiRequestOptions } from '../request-config';
 import type { Location, CreateLocation, UpdateLocation } from '../types';
 
 export const locationsApi = {
-    /** GET /orgs/:orgId/locations - List locations for organization */
-    list: async (orgId: string): Promise<Location[]> => {
+    list: async (clerkOrgId: string, options?: ApiRequestOptions): Promise<Location[]> => {
         const { data } = await apiClient.get<Location[]>(
-            `/orgs/${orgId}/locations`,
+            `/orgs/${clerkOrgId}/locations`,
+            { signal: options?.signal },
         );
         return data;
     },
 
-    /** POST /orgs/:orgId/locations - Create location */
-    create: async (orgId: string, body: CreateLocation): Promise<Location> => {
+    create: async (clerkOrgId: string, body: CreateLocation): Promise<Location> => {
         const { data } = await apiClient.post<Location>(
-            `/orgs/${orgId}/locations`,
+            `/orgs/${clerkOrgId}/locations`,
             body,
         );
         return data;
     },
 
-    /** GET /orgs/:orgId/locations/:id - Get location by ID */
-    getById: async (orgId: string, id: string): Promise<Location> => {
+    getById: async (
+        clerkOrgId: string,
+        id: string,
+        options?: ApiRequestOptions,
+    ): Promise<Location> => {
         const { data } = await apiClient.get<Location>(
-            `/orgs/${orgId}/locations/${id}`,
+            `/orgs/${clerkOrgId}/locations/${id}`,
+            { signal: options?.signal },
         );
         return data;
     },
 
-    /** PATCH /orgs/:orgId/locations/:id - Update location */
     update: async (
-        orgId: string,
+        clerkOrgId: string,
         id: string,
         body: UpdateLocation,
     ): Promise<Location> => {
         const { data } = await apiClient.patch<Location>(
-            `/orgs/${orgId}/locations/${id}`,
+            `/orgs/${clerkOrgId}/locations/${id}`,
             body,
         );
         return data;
     },
 
-    /** DELETE /orgs/:orgId/locations/:id - Delete location */
-    delete: async (orgId: string, id: string): Promise<void> => {
-        await apiClient.delete(`/orgs/${orgId}/locations/${id}`);
+    delete: async (clerkOrgId: string, id: string): Promise<void> => {
+        await apiClient.delete(`/orgs/${clerkOrgId}/locations/${id}`);
     },
 };

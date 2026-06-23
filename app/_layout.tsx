@@ -4,10 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
 import {
-    QueryClient,
     QueryClientProvider,
     focusManager,
 } from '@tanstack/react-query';
+import { queryClient } from '../lib/api/query-client';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { useFonts } from '@expo-google-fonts/urbanist/useFonts';
@@ -34,19 +34,6 @@ if (__DEV__) {
 SplashScreen.preventAutoHideAsync();
 
 export { ErrorBoundary } from '../components/ErrorBoundary';
-
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 60_000,
-            gcTime: 5 * 60 * 1000,
-            refetchOnWindowFocus: true,
-            refetchOnReconnect: true,
-            retry: 2,
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-        },
-    },
-});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!publishableKey) {

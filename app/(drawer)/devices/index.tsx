@@ -15,8 +15,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-    useOrganizations,
-    useLocations,
+    useActiveOrgContext,
     useDevices,
     useCreateDevice,
     useUpdateDevice,
@@ -28,6 +27,7 @@ import { ConfirmModal } from '../../../components/ConfirmModal';
 import { DeviceCard } from '../../../components/DeviceCard';
 import { DeviceListItem } from '../../../components/DeviceListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
+import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
 
 export default function DevicesScreen() {
@@ -35,10 +35,7 @@ export default function DevicesScreen() {
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
 
-    const { data: orgs } = useOrganizations();
-    const firstOrg = orgs?.[0];
-    const clerkOrgId = firstOrg?.clerkOrgId ?? firstOrg?.id;
-    const { data: locations } = useLocations(clerkOrgId);
+    const { clerkOrgId, locations, org: firstOrg } = useActiveOrgContext();
 
     const {
         data: devices,
@@ -173,7 +170,7 @@ export default function DevicesScreen() {
                     <RefreshControl
                         refreshing={isRefetching && !isLoading}
                         onRefresh={() => refetch()}
-                        tintColor="#ef4444"
+                        tintColor={colors.primaryHex}
                     />
                 }
             >
@@ -222,14 +219,14 @@ export default function DevicesScreen() {
                 {!firstOrg && !isLoading && (
                     <View className="py-6 px-4 rounded-xl bg-zinc-800 mb-4">
                         <Text className="text-zinc-400 text-center">
-                            Create or join an organization first.
+                            Create or join an firstOrganization first.
                         </Text>
                     </View>
                 )}
 
                 {isLoading && (
                     <View className="py-12 items-center">
-                        <ActivityIndicator size="large" color="#ef4444" />
+                        <ActivityIndicator size="large" color={colors.primaryHex} />
                     </View>
                 )}
 
@@ -358,7 +355,7 @@ export default function DevicesScreen() {
                         </ScrollView>
                         <Pressable
                             onPress={() => setSearchModalVisible(false)}
-                            className="py-3 rounded-xl bg-red-500 items-center active:opacity-90"
+                            className="py-3 rounded-xl bg-primary items-center active:opacity-90"
                         >
                             <Text className="font-sans-medium text-white">
                                 Close
@@ -451,7 +448,7 @@ export default function DevicesScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setCreateModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -538,7 +535,7 @@ export default function DevicesScreen() {
                                     setPairModalVisible(false);
                                     setPairLocationId(null);
                                 }}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel
@@ -596,7 +593,7 @@ export default function DevicesScreen() {
                         <View className="flex-row gap-3">
                             <Pressable
                                 onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
                             >
                                 <Text className="font-sans-medium text-white">
                                     Cancel

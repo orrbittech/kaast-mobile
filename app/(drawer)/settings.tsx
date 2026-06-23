@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { useClerk } from '@clerk/clerk-expo';
 import { useLocalCredentials } from '@clerk/clerk-expo/local-credentials';
+import { invalidateOnSignOut } from '../../lib/api/invalidate';
 import { Text } from '../../components/ui/Text';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 
@@ -43,6 +44,7 @@ export default function SettingsScreen() {
     };
 
     const onSignOut = async () => {
+        invalidateOnSignOut();
         await signOut?.();
         router.replace('/sign-in');
     };

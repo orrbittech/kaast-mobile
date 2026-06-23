@@ -2,6 +2,7 @@ import { Pressable } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useNavigation, DrawerActions } from 'expo-router/react-navigation';
 import { ChevronLeft, Menu } from 'lucide-react-native';
+import { colors } from '../lib/theme/colors';
 
 /**
  * Header left component - shows back button on detail pages, menu toggle on list pages.
@@ -21,9 +22,9 @@ export function DetailHeaderLeft() {
         return (
             <Pressable
                 onPress={() => router.back()}
-                className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500 items-center justify-center active:opacity-80 ml-4"
+                className="w-10 h-10 rounded-full bg-primary/10 border border-primary items-center justify-center active:opacity-80 ml-4"
             >
-                <ChevronLeft size={24} color="#ef4444" strokeWidth={2.5} />
+                <ChevronLeft size={24} color={colors.primaryHex} strokeWidth={2.5} />
             </Pressable>
         );
     }

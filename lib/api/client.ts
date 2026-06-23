@@ -1,14 +1,15 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getClerkInstance } from '@clerk/clerk-expo';
 import { emitNetworkError } from './networkEvents';
+import { invalidateOnSignOut } from './invalidate';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 /** Request timeout in milliseconds (30s) */
 export const API_TIMEOUT_MS = 30_000;
 
-/** Max retries for transient failures (5xx, ERR_NETWORK) */
-const MAX_RETRIES = 2;
+/** Max retries for transient failures — React Query handles query retries */
+const MAX_RETRIES = 0;
 
 /** Custom config for retry tracking */
 interface RetryableConfig extends InternalAxiosRequestConfig {
@@ -18,7 +19,7 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
 /** Extended config for org-scoped requests (create/pair device, etc.) */
 export interface ApiRequestConfig {
     /** Clerk org ID to include in JWT for org-scoped endpoints */
-    organizationId?: string;
+    clerkOrgId?: string;
 }
 
 /**
@@ -75,15 +76,15 @@ function toApiError(error: AxiosError): ApiError {
 
 /**
  * Request interceptor: injects Clerk Bearer token into requests.
- * When organizationId is in config, fetches org-scoped token so JWT includes org claims.
+ * When clerkOrgId is in config, fetches org-scoped token so JWT includes org claims.
  */
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig & ApiRequestConfig) => {
         try {
             const clerkInstance = getClerkInstance();
-            const orgId = config.organizationId;
-            const token = orgId
-                ? await clerkInstance.session?.getToken({ organizationId: orgId })
+            const clerkOrgId = config.clerkOrgId;
+            const token = clerkOrgId
+                ? await clerkInstance.session?.getToken({ organizationId: clerkOrgId })
                 : await clerkInstance.session?.getToken();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
@@ -119,6 +120,7 @@ apiClient.interceptors.response.use(
         }
 
         if (error.response?.status === 401) {
+            invalidateOnSignOut();
             try {
                 const clerkInstance = getClerkInstance();
                 await clerkInstance.signOut();
@@ -140,4 +142,8 @@ apiClient.interceptors.response.use(
  */
 export function createAbortController(): AbortController {
     return new AbortController();
+}
+
+export function getMediaSocketUrl(): string {
+    return API_BASE_URL.replace(/\/$/, '');
 }

@@ -63,7 +63,7 @@ export function StatRow({ label, value, highlight, inactive }: StatRowProps) {
     const valueColor = highlight
         ? 'text-approve'
         : inactive
-          ? 'text-red-500'
+          ? 'text-primary'
           : 'text-white';
     return (
         <View className="flex-row justify-between items-center py-1.5">

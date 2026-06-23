@@ -1,47 +1,46 @@
 import { apiClient } from '../client';
-import type {
-    Playlist,
-    PlaylistItem,
-    CreatePlaylist,
-    UpdatePlaylist,
-    CreatePlaylistItem,
-    UpdatePlaylistItem,
-} from '../types';
+import type { Playlist, PlaylistItem, CreatePlaylist, UpdatePlaylist, CreatePlaylistItem, UpdatePlaylistItem } from '../types';
+import type { ApiRequestOptions } from '../request-config';
 
 export const playlistsApi = {
-    /** GET /playlists?locationId - List playlists for location */
-    list: async (locationId: string): Promise<Playlist[]> => {
+    /** GET /playlists?orgId - List playlists for organization */
+    list: async (clerkOrgId: string, options?: ApiRequestOptions): Promise<Playlist[]> => {
         const { data } = await apiClient.get<Playlist[]>(
-            `/playlists?locationId=${locationId}`,
+            `/playlists?orgId=${encodeURIComponent(clerkOrgId)}`,
+            { signal: options?.signal },
         );
         return data;
     },
 
-    /** POST /playlists - Create playlist */
+    /** GET /playlists/media?orgId - List playlists with items (media library) */
+    listWithItems: async (
+        clerkOrgId: string,
+        options?: ApiRequestOptions,
+    ): Promise<Playlist[]> => {
+        const { data } = await apiClient.get<Playlist[]>(
+            `/playlists/media?orgId=${encodeURIComponent(clerkOrgId)}`,
+            { signal: options?.signal },
+        );
+        return data;
+    },
+
     create: async (body: CreatePlaylist): Promise<Playlist> => {
         const { data } = await apiClient.post<Playlist>('/playlists', body);
         return data;
     },
 
-    /** GET /playlists/:id - Get playlist with items */
-    getById: async (id: string): Promise<Playlist> => {
-        const { data } = await apiClient.get<Playlist>(`/playlists/${id}`);
+    getById: async (id: string, options?: ApiRequestOptions): Promise<Playlist> => {
+        const { data } = await apiClient.get<Playlist>(`/playlists/${id}`, {
+            signal: options?.signal,
+        });
         return data;
     },
 
-    /** PATCH /playlists/:id - Update playlist */
-    update: async (
-        id: string,
-        body: UpdatePlaylist,
-    ): Promise<Playlist> => {
-        const { data } = await apiClient.patch<Playlist>(
-            `/playlists/${id}`,
-            body,
-        );
+    update: async (id: string, body: UpdatePlaylist): Promise<Playlist> => {
+        const { data } = await apiClient.patch<Playlist>(`/playlists/${id}`, body);
         return data;
     },
 
-    /** DELETE /playlists/:id - Delete playlist */
     delete: async (id: string): Promise<{ deleted: boolean }> => {
         const { data } = await apiClient.delete<{ deleted: boolean }>(
             `/playlists/${id}`,
@@ -49,7 +48,6 @@ export const playlistsApi = {
         return data ?? { deleted: true };
     },
 
-    /** POST /playlists/:id/items - Add item to playlist */
     addItem: async (
         playlistId: string,
         body: CreatePlaylistItem,
@@ -61,7 +59,6 @@ export const playlistsApi = {
         return data;
     },
 
-    /** PATCH /playlists/:id/items/:itemId - Update playlist item */
     updateItem: async (
         playlistId: string,
         itemId: string,
@@ -74,7 +71,6 @@ export const playlistsApi = {
         return data;
     },
 
-    /** DELETE /playlists/:id/items/:itemId - Remove item from playlist */
     removeItem: async (
         playlistId: string,
         itemId: string,
@@ -85,7 +81,6 @@ export const playlistsApi = {
         return data ?? { deleted: true };
     },
 
-    /** POST /playlists/:id/assign/:deviceId - Assign playlist to device */
     assign: async (
         playlistId: string,
         deviceId: string,
@@ -96,7 +91,6 @@ export const playlistsApi = {
         return data;
     },
 
-    /** DELETE /playlists/:id/unassign/:deviceId - Unassign playlist from device */
     unassign: async (
         playlistId: string,
         deviceId: string,

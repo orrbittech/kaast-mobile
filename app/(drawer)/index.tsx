@@ -3,13 +3,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import {
     useDashboardSummary,
-    useDevices,
     useMediaSession,
 } from '../../lib/hooks';
 import { Text } from '../../components/ui/Text';
 import { SummaryCard, StatRow } from '../../components/SummaryCard';
 import { formatDurationLong } from '../../lib/utils/formatDuration';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
+import { colors } from '../../lib/theme/colors';
 
 /**
  * Dashboard - summary of devices, media, playlists, and now playing.
@@ -18,10 +18,9 @@ import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 export default function DashboardScreen() {
     const insets = useSafeAreaInsets();
     const summary = useDashboardSummary();
-    const { data: devices } = useDevices(summary.clerkOrgId);
-    const firstDevice = devices?.[0];
-    const firstDeviceId = firstDevice?.deviceId;
-    const { data: session } = useMediaSession(firstDeviceId);
+    const { data: session } = useMediaSession(summary.firstDeviceId, {
+        enabled: !!summary.firstDeviceId,
+    });
 
     if (summary.isLoading) {
         return (
@@ -31,7 +30,7 @@ export default function DashboardScreen() {
                     paddingTop: insets.top + DRAWER_HEADER_HEIGHT,
                 }}
             >
-                <ActivityIndicator size="large" color="#22c55e" />
+                <ActivityIndicator size="large" color={colors.primaryHex} />
             </View>
         );
     }
@@ -143,7 +142,7 @@ export default function DashboardScreen() {
                                     : 'Unknown'}
                             </Text>
                             <Text className="text-base text-zinc-400 mt-1">
-                                {devices?.[0]?.name ?? 'Device'} •{' '}
+                                {summary.firstDeviceName ?? 'Device'} •{' '}
                                 {Math.floor(session.position / 60)}:
                                 {String(
                                     Math.floor(session.position % 60),
@@ -153,9 +152,9 @@ export default function DashboardScreen() {
                                     Math.floor(session.duration % 60),
                                 ).padStart(2, '0')}
                             </Text>
-                            {firstDevice && (
+                            {summary.firstDeviceDbId && (
                                 <Link
-                                    href={`/control/${firstDevice.id}`}
+                                    href={`/control/${summary.firstDeviceDbId}`}
                                     asChild
                                 >
                                     <Pressable className="mt-3 py-2 px-4 rounded-lg bg-approve self-start active:opacity-90">
