@@ -1,14 +1,18 @@
-import { Text as RNText, TextProps } from "react-native";
+import { StyleSheet, Text as RNText, TextProps } from 'react-native';
 
 /**
  * App Text component with Urbanist font as default.
- * Use font-sans-medium or font-sans-semibold in className for other weights.
+ * Use font-sans-medium, font-sans-semibold, or font-indie-flower in className for other fonts.
+ * Only applies default font when style/className does not specify fontFamily.
  */
 export function Text({ style, ...props }: TextProps) {
-  return (
-    <RNText
-      style={[{ fontFamily: "Urbanist_400Regular" }, style]}
-      {...props}
-    />
-  );
+    const flattened = style ? StyleSheet.flatten(style) : undefined;
+    const hasFontFamily = flattened?.fontFamily != null;
+    const baseStyle = !hasFontFamily ? { fontFamily: 'Urbanist_400Regular' } : undefined;
+    return (
+        <RNText
+            style={[baseStyle, style].filter(Boolean)}
+            {...props}
+        />
+    );
 }

@@ -1,26 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../api";
+import { useQuery } from '@tanstack/react-query';
+import { mediaApi, mediaSessionKeys, type MediaSession } from '../api';
 
-export interface MediaSession {
-  deviceId: string;
-  mediaUrl?: string | null;
-  position: number;
-  duration: number;
-  playing: boolean;
-  volume?: number | null;
-}
+export type { MediaSession };
 
-export function useMediaSession(deviceId: string | undefined) {
-  return useQuery({
-    queryKey: ["mediaSession", deviceId],
-    queryFn: async () => {
-      if (!deviceId) return null;
-      const { data } = await apiClient.get<MediaSession>(
-        `/media/sessions/${deviceId}`
-      );
-      return data;
-    },
-    enabled: !!deviceId,
-    refetchInterval: 5000,
-  });
+export function useMediaSession(
+    deviceId: string | undefined,
+    options?: { enabled?: boolean },
+) {
+    return useQuery({
+        queryKey: mediaSessionKeys.detail(deviceId ?? ''),
+        queryFn: ({ signal }) => mediaApi.getSession(deviceId!, { signal }),
+        enabled: (options?.enabled ?? true) && !!deviceId,
+        refetchInterval: 5000,
+    });
 }

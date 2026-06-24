@@ -1,115 +1,186 @@
-import type { ComponentProps } from "react";
-import { View, ScrollView, Pressable } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
-import { useBookings, useLocations, useWashPackages } from "../../lib/hooks";
-import { Text } from "../../components/ui/Text";
-import { DRAWER_HEADER_HEIGHT } from "../../lib/constants";
+import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
+import {
+    useDashboardSummary,
+    useMediaSession,
+} from '../../lib/hooks';
+import { Text } from '../../components/ui/Text';
+import { SummaryCard, StatRow } from '../../components/SummaryCard';
+import { formatDurationLong } from '../../lib/utils/formatDuration';
+import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
+import { colors } from '../../lib/theme/colors';
 
-type IoniconName = ComponentProps<typeof Ionicons>["name"];
-
-function QuickActionTile({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: IoniconName;
-  label: string;
-}) {
-  return (
-    <View className="flex-1">
-      <Link href={href} asChild>
-        <Pressable
-          className="rounded-xl bg-zinc-800 p-4 active:opacity-90 flex-1 justify-center"
-          style={{ minHeight: 96 }}
-        >
-          <View className="flex-row items-center justify-center gap-2 px-1">
-            <Ionicons name={icon} size={20} color="#ffffff" />
-            <Text className="font-sans-medium text-white shrink" numberOfLines={1}>
-              {label}
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color="#ffffff" />
-          </View>
-        </Pressable>
-      </Link>
-    </View>
-  );
-}
-
+/**
+ * Dashboard - summary of devices, media, playlists, and now playing.
+ * Card-based layout with stats and quick links.
+ */
 export default function DashboardScreen() {
-  const insets = useSafeAreaInsets();
-  const { user } = useUser();
-  const { data: locations } = useLocations();
-  const { data: washPackages } = useWashPackages();
-  const { data: bookings } = useBookings();
-  const queueJobs = (bookings ?? []).filter((item) => item.visitStatus === "ARRIVED").length;
-  const processingJobs = (bookings ?? []).filter((item) => item.visitStatus === "IN_SERVICE").length;
-  const doneJobs = (bookings ?? []).filter((item) => item.visitStatus === "COMPLETED").length;
+    const insets = useSafeAreaInsets();
+    const summary = useDashboardSummary();
+    const { data: session } = useMediaSession(summary.firstDeviceId, {
+        enabled: !!summary.firstDeviceId,
+    });
 
-  const greeting = user?.firstName
-    ? `Hi, ${user.firstName}`
-    : "Welcome back";
+    if (summary.isLoading) {
+        return (
+            <View
+                className="flex-1 bg-base items-center justify-center"
+                style={{
+                    paddingTop: insets.top + DRAWER_HEADER_HEIGHT,
+                }}
+            >
+                <ActivityIndicator size="large" color={colors.primaryHex} />
+            </View>
+        );
+    }
 
-  return (
-    <ScrollView
-      className="flex-1 bg-base"
-      contentContainerStyle={{
-        flexGrow: 1,
-        padding: 24,
-        paddingTop: insets.top + DRAWER_HEADER_HEIGHT + 24,
-      }}
-    >
-      <View className="mb-6">
-        <Text className="text-2xl font-sans-semibold text-white">
-          {greeting}
-        </Text>
-      </View>
+    if (!summary.clerkOrgId) {
+        return (
+            <View
+                className="flex-1 bg-base items-center justify-center px-6"
+                style={{
+                    paddingTop: insets.top + DRAWER_HEADER_HEIGHT,
+                }}
+            >
+                <View className="py-6 px-4 rounded-xl bg-zinc-800">
+                    <Text className="text-base text-zinc-400 text-center">
+                        Create or join an organization first.
+                    </Text>
+                </View>
+            </View>
+        );
+    }
 
-      <View className="mb-6">
-        <Text className="text-lg font-sans-semibold text-white mb-3">
-          Quick actions
-        </Text>
-        <View className="gap-3">
-          <View className="flex-row gap-3">
-            <QuickActionTile href="/scan" icon="scan-outline" label="Scan" />
-            <QuickActionTile href="/walk-in" icon="add-circle-outline" label="Book In" />
-          </View>
-          <View className="flex-row gap-3">
-            <QuickActionTile href="/devices" icon="car-outline" label="Vehicles" />
-            <QuickActionTile href="/jobs" icon="list-outline" label="Jobs" />
-          </View>
-        </View>
-      </View>
+    return (
+        <ScrollView
+            className="flex-1 bg-base"
+            contentContainerStyle={{
+                flexGrow: 1,
+                padding: 24,
+                paddingTop: insets.top + DRAWER_HEADER_HEIGHT + 24,
+                paddingBottom: 48,
+            }}
+        >
+            {/* Devices Summary */}
+            <SummaryCard
+                title="Devices"
+                href="/devices"
+                icon="phone-portrait-outline"
+            >
+                <View className="gap-1">
+                    <StatRow label="Total" value={summary.totalDevices} />
+                    <StatRow
+                        label="Active"
+                        value={summary.activeDevices}
+                        highlight
+                    />
+                    <StatRow
+                        label="Inactive"
+                        value={summary.inactiveDevices}
+                        inactive
+                    />
+                </View>
+            </SummaryCard>
 
-      <View className="mb-6">
-        <Text className="text-lg font-sans-semibold text-white mb-3">
-          Jobs summary
-        </Text>
-        <View className="flex-row gap-3">
-          <View className="flex-1 rounded-xl bg-zinc-800 p-3">
-            <Text className="text-zinc-400 text-xs">Queue</Text>
-            <Text className="mt-1 text-xl font-sans-semibold text-white">{queueJobs}</Text>
-          </View>
-          <View className="flex-1 rounded-xl bg-zinc-800 p-3">
-            <Text className="text-zinc-400 text-xs">Processing</Text>
-            <Text className="mt-1 text-xl font-sans-semibold text-white">{processingJobs}</Text>
-          </View>
-          <View className="flex-1 rounded-xl bg-zinc-800 p-3">
-            <Text className="text-zinc-400 text-xs">Done</Text>
-            <Text className="mt-1 text-xl font-sans-semibold text-white">{doneJobs}</Text>
-          </View>
-        </View>
-      </View>
+            {/* Media Summary */}
+            <SummaryCard
+                title="Media"
+                href="/media"
+                icon="play-circle-outline"
+            >
+                <View className="gap-1">
+                    <StatRow label="Media Files" value={summary.mediaFileCount} />
+                    <StatRow
+                        label="Total Duration"
+                        value={formatDurationLong(summary.totalPlayTimeSec)}
+                    />
+                </View>
+            </SummaryCard>
 
-      <View className="rounded-xl bg-zinc-800 p-4">
-        <Text className="font-sans-medium text-white">Workspace snapshot</Text>
-        <Text className="mt-1 text-zinc-400">
-          Locations: {locations?.length ?? 0} · Wash packages: {washPackages?.length ?? 0}
-        </Text>
-      </View>
-    </ScrollView>
-  );
+            {/* Playlists Summary */}
+            <SummaryCard
+                title="Playlists"
+                href="/playlists"
+                icon="list-outline"
+            >
+                <View className="gap-1">
+                    <StatRow label="Total" value={summary.totalPlaylists} />
+                    <StatRow
+                        label="Active"
+                        value={summary.activePlaylistCount}
+                        highlight
+                    />
+                    <StatRow
+                        label="Total Play Time"
+                        value={formatDurationLong(summary.totalPlayTimeSec)}
+                    />
+                </View>
+            </SummaryCard>
+
+            {/* Now Playing */}
+            <View className="mb-6">
+                <Text className="text-xl font-sans-semibold text-white mb-3">
+                    Now Playing
+                </Text>
+                <View className="p-4 rounded-xl bg-zinc-800">
+                    {session?.playing ? (
+                        <>
+                            <Text className="font-sans-medium text-base text-white">
+                                {session.mediaUrl
+                                    ? (() => {
+                                          try {
+                                              return (
+                                                  new URL(session.mediaUrl)
+                                                      .pathname.split('/')
+                                                      .pop() ?? 'Media'
+                                              );
+                                          } catch {
+                                              return 'Media';
+                                          }
+                                      })()
+                                    : 'Unknown'}
+                            </Text>
+                            <Text className="text-base text-zinc-400 mt-1">
+                                {summary.firstDeviceName ?? 'Device'} •{' '}
+                                {Math.floor(session.position / 60)}:
+                                {String(
+                                    Math.floor(session.position % 60),
+                                ).padStart(2, '0')}{' '}
+                                / {Math.floor(session.duration / 60)}:
+                                {String(
+                                    Math.floor(session.duration % 60),
+                                ).padStart(2, '0')}
+                            </Text>
+                            {summary.firstDeviceDbId && (
+                                <Link
+                                    href={`/control/${summary.firstDeviceDbId}`}
+                                    asChild
+                                >
+                                    <Pressable className="mt-3 py-2 px-4 rounded-lg bg-approve self-start active:opacity-90">
+                                        <Text className="font-sans-medium text-base text-white">
+                                            Control
+                                        </Text>
+                                    </Pressable>
+                                </Link>
+                            )}
+                        </>
+                    ) : (
+                        <View className="items-center py-4">
+                            <Text className="text-base text-zinc-400 text-center">
+                                Nothing playing. Select a device to start.
+                            </Text>
+                            <Link href="/devices" asChild>
+                                <Pressable className="mt-3 py-2 px-4 rounded-lg bg-approve active:opacity-90">
+                                    <Text className="font-sans-medium text-base text-white">
+                                        View Devices
+                                    </Text>
+                                </Pressable>
+                            </Link>
+                        </View>
+                    )}
+                </View>
+            </View>
+        </ScrollView>
+    );
 }
