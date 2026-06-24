@@ -10,6 +10,7 @@ import {
     Platform,
     RefreshControl,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,11 +23,18 @@ import {
     useRemovePlaylistItem,
     useMediaItems,
     useActiveOrgContext,
+    usePlaylistDeviceStats,
+    usePausePlaylistOnAllDevices,
+    useResumePlaylistOnAllDevices,
 } from '../../../lib/hooks';
+import { deviceKeys, mediaSessionKeys } from '../../../lib/api';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { MediaListItem } from '../../../components/MediaListItem';
 import { MediaCover } from '../../../components/MediaCover';
+import { PlaylistStatsCharts } from '../../../components/PlaylistStatsCharts';
+import { PlaylistDevicesSection } from '../../../components/PlaylistDevicesSection';
+import { PlaylistSchedulesSection } from '../../../components/PlaylistSchedulesSection';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
@@ -45,6 +53,7 @@ function getItemTitle(item: { mediaUrl: string; title?: string | null }): string
 export default function PlaylistDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+    const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
@@ -55,13 +64,16 @@ export default function PlaylistDetailScreen() {
         refetch,
         isRefetching,
     } = usePlaylist(id);
-    const { clerkOrgId } = useActiveOrgContext();
+    const { clerkOrgId, locations } = useActiveOrgContext();
     const { data: mediaItems } = useMediaItems(clerkOrgId);
+    const deviceStats = usePlaylistDeviceStats(id, clerkOrgId, playlist?.items);
     const updatePlaylist = useUpdatePlaylist(playlist?.clerkOrgId);
     const deletePlaylist = useDeletePlaylist(playlist?.clerkOrgId);
     const addItem = useAddPlaylistItem(id, playlist?.clerkOrgId);
     const updatePlaylistItem = useUpdatePlaylistItem(id, playlist?.clerkOrgId);
     const removeItem = useRemovePlaylistItem(id, playlist?.clerkOrgId);
+    const pauseAll = usePausePlaylistOnAllDevices(id);
+    const resumeAll = useResumePlaylistOnAllDevices(id);
 
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editItemModalVisible, setEditItemModalVisible] = useState(false);
@@ -211,6 +223,16 @@ export default function PlaylistDetailScreen() {
         }
     };
 
+    const handleRefresh = async () => {
+        await refetch();
+        if (clerkOrgId) {
+            await queryClient.invalidateQueries({
+                queryKey: deviceKeys.list(clerkOrgId),
+            });
+        }
+        await queryClient.invalidateQueries({ queryKey: mediaSessionKeys.all });
+    };
+
     if (!id) {
         return (
             <View className="flex-1 bg-base items-center justify-center">
@@ -227,7 +249,7 @@ export default function PlaylistDetailScreen() {
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefetching && !isLoading}
-                        onRefresh={() => refetch()}
+                        onRefresh={() => void handleRefresh()}
                         tintColor={colors.primaryHex}
                     />
                 }
@@ -262,6 +284,42 @@ export default function PlaylistDetailScreen() {
                                 {playlist.name}
                             </Text>
                             <View className="flex-row items-center gap-2">
+                                {deviceStats.assignedDevices.length > 0 ? (
+                                    <>
+                                        <Pressable
+                                            onPress={() => pauseAll.mutate()}
+                                            disabled={pauseAll.isPending}
+                                            className="w-10 h-10 rounded-lg bg-zinc-700 items-center justify-center active:opacity-80"
+                                            accessibilityLabel="Pause on all devices"
+                                        >
+                                            {pauseAll.isPending ? (
+                                                <ActivityIndicator size="small" color="#a1a1aa" />
+                                            ) : (
+                                                <Ionicons
+                                                    name="pause-circle-outline"
+                                                    size={22}
+                                                    color="#a1a1aa"
+                                                />
+                                            )}
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => resumeAll.mutate()}
+                                            disabled={resumeAll.isPending}
+                                            className="w-10 h-10 rounded-lg bg-zinc-700 items-center justify-center active:opacity-80"
+                                            accessibilityLabel="Resume on all devices"
+                                        >
+                                            {resumeAll.isPending ? (
+                                                <ActivityIndicator size="small" color="#a1a1aa" />
+                                            ) : (
+                                                <Ionicons
+                                                    name="play-circle-outline"
+                                                    size={22}
+                                                    color="#16a34a"
+                                                />
+                                            )}
+                                        </Pressable>
+                                    </>
+                                ) : null}
                                 <Pressable
                                     onPress={openEditModal}
                                     className="w-10 h-10 rounded-lg bg-zinc-700 items-center justify-center active:opacity-80"
@@ -294,7 +352,19 @@ export default function PlaylistDetailScreen() {
                             </View>
                         </View>
 
-                        <Text className="text-zinc-400 text-sm mb-3">
+                        <PlaylistStatsCharts
+                            stats={deviceStats}
+                            isLoading={deviceStats.isLoading}
+                        />
+
+                        <PlaylistDevicesSection
+                            devices={deviceStats.assignedDevices}
+                            locations={locations}
+                        />
+
+                        <PlaylistSchedulesSection playlistId={playlist.id} />
+
+                        <Text className="text-zinc-400 text-sm mb-3 mt-8">
                             Items ({playlist.items?.length ?? 0})
                         </Text>
                         <View className="gap-3">

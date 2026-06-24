@@ -29,6 +29,11 @@ export const playlistKeys = {
     detail: (id: string) => [...playlistKeys.details(), id] as const,
     assigned: (deviceId: string) =>
         [...playlistKeys.all, 'assigned', deviceId] as const,
+    schedules: () => [...playlistKeys.all, 'schedules'] as const,
+    scheduleList: (playlistId: string) =>
+        [...playlistKeys.schedules(), playlistId] as const,
+    devices: (playlistId: string) =>
+        [...playlistKeys.all, 'devices', playlistId] as const,
 };
 
 export const mediaSessionKeys = {

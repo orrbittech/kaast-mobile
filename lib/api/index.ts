@@ -27,6 +27,12 @@ export type {
     UpdatePlaylist,
     CreatePlaylistItem,
     UpdatePlaylistItem,
+    PlaylistSchedule,
+    CreatePlaylistSchedule,
+    UpdatePlaylistSchedule,
+    SetPlaylistScheduleDevices,
+    PlaylistAssignedDevice,
+    PlaylistDeviceAssignmentSource,
 } from './types';
 export {
     deviceKeys,
@@ -44,6 +50,7 @@ export {
     invalidateAfterPair,
     invalidateOnSignOut,
     invalidateAfterPlaylistAssignment,
+    invalidateAfterPlaylistContentChange,
 } from './invalidate';
 export {
     usersApi,

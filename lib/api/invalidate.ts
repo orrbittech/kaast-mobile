@@ -8,6 +8,7 @@ import {
     mediaLibraryKeys,
 } from './query-keys';
 import { clearAppCache } from './query-client';
+import type { Device } from './types';
 
 export function invalidateDevices(queryClient: QueryClient): void {
     void queryClient.invalidateQueries({ queryKey: deviceKeys.all });
@@ -109,4 +110,34 @@ export function invalidateAfterPlaylistAssignment(
     void queryClient.invalidateQueries({ queryKey: deviceKeys.all });
     void queryClient.invalidateQueries({ queryKey: playlistKeys.all });
     void queryClient.invalidateQueries({ queryKey: mediaLibraryKeys.all });
+}
+
+/** Refresh saved and device-assigned playlist caches after content changes. */
+export function invalidateAfterPlaylistContentChange(
+    queryClient: QueryClient,
+    options: {
+        clerkOrgId?: string;
+        playlistId?: string;
+        deviceHardwareId?: string;
+        deviceDbId?: string;
+    },
+): void {
+    invalidateAfterPlaylistAssignment(queryClient, options);
+
+    if (options.clerkOrgId && options.playlistId) {
+        const devices = queryClient.getQueryData<Device[]>(
+            deviceKeys.list(options.clerkOrgId),
+        );
+        for (const device of devices ?? []) {
+            if (
+                device.activePlaylistId === options.playlistId &&
+                device.deviceId
+            ) {
+                void queryClient.refetchQueries({
+                    queryKey: playlistKeys.assigned(device.deviceId),
+                    type: 'active',
+                });
+            }
+        }
+    }
 }

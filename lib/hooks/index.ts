@@ -26,6 +26,13 @@ export {
     useUnassignPlaylist,
     useLoadPlaylistOnDevice,
     useAssignedPlaylist,
+    usePlaylistSchedules,
+    useCreatePlaylistSchedule,
+    useUpdatePlaylistSchedule,
+    useDeletePlaylistSchedule,
+    useSetPlaylistScheduleDevices,
+    usePausePlaylistOnAllDevices,
+    useResumePlaylistOnAllDevices,
 } from './usePlaylists';
 export {
     useMediaItems,
@@ -37,5 +44,10 @@ export {
 } from './useMediaLibrary';
 export { useDashboardSummary, type DashboardSummary } from './useDashboardSummary';
 export { useMediaSession } from './useMediaSession';
+export {
+    usePlaylistDeviceStats,
+    type PlaylistDeviceStats,
+    type MediaTypeCounts,
+} from './usePlaylistDeviceStats';
 export { useSendMediaCommand } from './useSendMediaCommand';
 export { useUserProfile } from './useUser';

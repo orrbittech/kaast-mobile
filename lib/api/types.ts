@@ -163,6 +163,7 @@ export interface CreatePlaylistItem {
     title?: string | null;
     duration?: number | null;
     order?: number;
+    mediaId?: string | null;
 }
 
 /** Update playlist item request body */
@@ -171,6 +172,63 @@ export interface UpdatePlaylistItem {
     title?: string | null;
     duration?: number | null;
     order?: number;
+    mediaId?: string | null;
+}
+
+export type PlaylistDeviceAssignmentSource = 'manual' | 'schedule' | 'both';
+
+/** Device linked to a playlist via manual assign or schedule */
+export interface PlaylistAssignedDevice {
+    id: string;
+    name: string;
+    status: string;
+    locationId: string | null;
+    assignmentSource: PlaylistDeviceAssignmentSource;
+    isPlaying: boolean;
+}
+
+export type RepeatType = 'none' | 'daily' | 'weekly' | 'custom';
+export type DeviceTargetMode = 'all' | 'include' | 'exclude';
+
+/** Playlist schedule slot from API */
+export interface PlaylistSchedule {
+    id: string;
+    playlistId: string;
+    startTime: string;
+    endTime: string;
+    startDate: string;
+    endDate: string | null;
+    repeatType: RepeatType;
+    daysOfWeek: number[];
+    timezone: string;
+    priority: number;
+    enabled: boolean;
+    loopPlaylist: boolean;
+    deviceTargetMode: DeviceTargetMode;
+    deviceIds: string[];
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface CreatePlaylistSchedule {
+    startTime: string;
+    endTime: string;
+    startDate: string;
+    endDate?: string | null;
+    repeatType?: RepeatType;
+    daysOfWeek?: number[];
+    timezone?: string;
+    priority?: number;
+    enabled?: boolean;
+    loopPlaylist?: boolean;
+    deviceTargetMode?: DeviceTargetMode;
+    deviceIds?: string[];
+}
+
+export interface UpdatePlaylistSchedule extends Partial<CreatePlaylistSchedule> {}
+
+export interface SetPlaylistScheduleDevices {
+    deviceIds: string[];
 }
 
 /** Create location request body */

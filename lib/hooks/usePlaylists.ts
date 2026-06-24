@@ -11,11 +11,16 @@ import {
     type UpdatePlaylist,
     type CreatePlaylistItem,
     type UpdatePlaylistItem,
+    type PlaylistSchedule,
+    type CreatePlaylistSchedule,
+    type UpdatePlaylistSchedule,
+    type SetPlaylistScheduleDevices,
 } from '../api';
 import {
     invalidatePlaylists,
     invalidateDevices,
     invalidateAfterPlaylistAssignment,
+    invalidateAfterPlaylistContentChange,
 } from '../api/invalidate';
 import { mediaApi } from '../api/services/media.api';
 import { deviceKeys, mediaSessionKeys } from '../api/query-keys';
@@ -116,6 +121,10 @@ export function useUpdatePlaylist(clerkOrgId: string | undefined) {
                     clerkOrgId,
                     playlistId: variables.id,
                 });
+                invalidateAfterPlaylistContentChange(queryClient, {
+                    clerkOrgId,
+                    playlistId: variables.id,
+                });
             }
             showSuccessNotification('Playlist updated', data.name);
         },
@@ -151,8 +160,39 @@ export function useAddPlaylistItem(playlistId: string | undefined, clerkOrgId?: 
     return useMutation({
         mutationFn: (body: CreatePlaylistItem) =>
             playlistsApi.addItem(playlistId!, body),
-        onSuccess: (_, variables) => {
-            invalidateAfterPlaylistAssignment(queryClient, {
+        onSuccess: (newItem, variables) => {
+            if (playlistId) {
+                queryClient.setQueryData(
+                    playlistKeys.detail(playlistId),
+                    (old: Playlist | undefined) =>
+                        old
+                            ? {
+                                  ...old,
+                                  items: [...(old.items ?? []), newItem].sort(
+                                      (a, b) => a.order - b.order,
+                                  ),
+                              }
+                            : old,
+                );
+            }
+            if (clerkOrgId && playlistId) {
+                queryClient.setQueryData(
+                    playlistKeys.mediaList(clerkOrgId),
+                    (old: Playlist[] | undefined) =>
+                        old?.map((playlist) =>
+                            playlist.id === playlistId
+                                ? {
+                                      ...playlist,
+                                      items: [
+                                          ...(playlist.items ?? []),
+                                          newItem,
+                                      ].sort((a, b) => a.order - b.order),
+                                  }
+                                : playlist,
+                        ) ?? old,
+                );
+            }
+            invalidateAfterPlaylistContentChange(queryClient, {
                 clerkOrgId,
                 playlistId: playlistId ?? undefined,
             });
@@ -179,7 +219,7 @@ export function useUpdatePlaylistItem(playlistId: string | undefined, clerkOrgId
             body: UpdatePlaylistItem;
         }) => playlistsApi.updateItem(playlistId!, itemId, body),
         onSuccess: () => {
-            invalidateAfterPlaylistAssignment(queryClient, {
+            invalidateAfterPlaylistContentChange(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
             });
@@ -207,7 +247,7 @@ export function useBatchUpdatePlaylistItems(clerkOrgId?: string) {
             );
         },
         onSuccess: () => {
-            invalidateAfterPlaylistAssignment(queryClient, { clerkOrgId });
+            invalidateAfterPlaylistContentChange(queryClient, { clerkOrgId });
             invalidateDevices(queryClient);
             showSuccessNotification('Media updated');
         },
@@ -229,7 +269,7 @@ export function useBatchRemovePlaylistItems(clerkOrgId?: string) {
             );
         },
         onSuccess: () => {
-            invalidateAfterPlaylistAssignment(queryClient, { clerkOrgId });
+            invalidateAfterPlaylistContentChange(queryClient, { clerkOrgId });
             invalidateDevices(queryClient);
             showSuccessNotification('Removed from playlists');
         },
@@ -244,7 +284,7 @@ export function useRemovePlaylistItem(playlistId: string | undefined, clerkOrgId
         mutationFn: (itemId: string) =>
             playlistsApi.removeItem(playlistId!, itemId),
         onSuccess: () => {
-            invalidateAfterPlaylistAssignment(queryClient, {
+            invalidateAfterPlaylistContentChange(queryClient, {
                 playlistId: playlistId ?? undefined,
                 clerkOrgId,
             });
@@ -377,6 +417,134 @@ export function useUnassignPlaylist(playlistId: string | undefined, clerkOrgId?:
                 deviceHardwareId: deviceId,
             });
             invalidateDevices(queryClient);
+        },
+    });
+}
+
+/** List schedule slots for a playlist. */
+export function usePlaylistSchedules(playlistId: string | undefined) {
+    return useQuery({
+        queryKey: playlistKeys.scheduleList(playlistId ?? ''),
+        queryFn: ({ signal }) => playlistsApi.listSchedules(playlistId!, { signal }),
+        enabled: !!playlistId,
+        staleTime: 15_000,
+    });
+}
+
+export function useCreatePlaylistSchedule(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (body: CreatePlaylistSchedule) =>
+            playlistsApi.createSchedule(playlistId!, body),
+        onSuccess: () => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.scheduleList(playlistId),
+                });
+            }
+            showSuccessNotification('Schedule created');
+        },
+    });
+}
+
+export function useUpdatePlaylistSchedule(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            scheduleId,
+            body,
+        }: {
+            scheduleId: string;
+            body: UpdatePlaylistSchedule;
+        }) => playlistsApi.updateSchedule(playlistId!, scheduleId, body),
+        onSuccess: () => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.scheduleList(playlistId),
+                });
+            }
+            showSuccessNotification('Schedule updated');
+        },
+    });
+}
+
+export function useDeletePlaylistSchedule(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (scheduleId: string) =>
+            playlistsApi.deleteSchedule(playlistId!, scheduleId),
+        onSuccess: () => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.scheduleList(playlistId),
+                });
+            }
+            showSuccessNotification('Schedule deleted');
+        },
+    });
+}
+
+export function useSetPlaylistScheduleDevices(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            scheduleId,
+            body,
+        }: {
+            scheduleId: string;
+            body: SetPlaylistScheduleDevices;
+        }) => playlistsApi.setScheduleDevices(playlistId!, scheduleId, body),
+        onSuccess: () => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.scheduleList(playlistId),
+                });
+            }
+            showSuccessNotification('Schedule devices updated');
+        },
+    });
+}
+
+export function usePausePlaylistOnAllDevices(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => playlistsApi.pauseAll(playlistId!),
+        onSuccess: (data) => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.devices(playlistId),
+                });
+            }
+            showSuccessNotification(
+                data.pausedCount > 0
+                    ? `Paused on ${data.pausedCount} device${data.pausedCount === 1 ? '' : 's'}`
+                    : 'No devices were playing',
+            );
+        },
+    });
+}
+
+export function useResumePlaylistOnAllDevices(playlistId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => playlistsApi.resumeAll(playlistId!),
+        onSuccess: (data) => {
+            if (playlistId) {
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.devices(playlistId),
+                });
+            }
+            showSuccessNotification(
+                data.resumedCount > 0
+                    ? `Resumed on ${data.resumedCount} device${data.resumedCount === 1 ? '' : 's'}`
+                    : 'No paused devices to resume',
+            );
         },
     });
 }
