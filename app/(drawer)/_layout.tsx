@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CustomDrawerContent } from '../../components/CustomDrawerContent';
 import { DetailHeaderLeft } from '../../components/DetailHeaderLeft';
 import { HeaderAvatar } from '../../components/HeaderAvatar';
+import { TrialExpiredGate } from '../../components/TrialExpiredGate';
 import { useActiveOrgContext } from '../../lib/hooks';
 
 function ActiveOrgPrefetch() {
@@ -18,6 +19,7 @@ function ActiveOrgPrefetch() {
  */
 export default function DrawerLayout() {
     const { isSignedIn } = useAuth();
+    const { clerkOrgId } = useActiveOrgContext();
 
     if (!isSignedIn) {
         return <Redirect href="/sign-in" />;
@@ -26,7 +28,9 @@ export default function DrawerLayout() {
     return (
         <>
             <ActiveOrgPrefetch />
+            <TrialExpiredGate clerkOrgId={clerkOrgId}>
             <Drawer
+                drawerContent={(props) => <CustomDrawerContent {...props} />}
                 screenOptions={{
                     drawerPosition: 'left',
                     drawerType: 'front',
@@ -45,7 +49,6 @@ export default function DrawerLayout() {
                     drawerInactiveTintColor: '#e4e4e7',
                     drawerLabelStyle: { fontFamily: 'Urbanist_500Medium' },
                     overlayColor: 'rgba(0,0,0,0.5)',
-                    drawerContent: (props) => <CustomDrawerContent {...props} />,
                 }}
             >
                 <Drawer.Screen
@@ -128,6 +131,7 @@ export default function DrawerLayout() {
                     }}
                 />
             </Drawer>
+            </TrialExpiredGate>
         </>
     );
 }

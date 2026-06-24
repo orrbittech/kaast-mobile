@@ -1,3 +1,4 @@
+/** KAAST — Proprietary software of Orrbit Systems (https://www.orrbit.co.za/) */
 import { useEffect } from 'react';
 import { Appearance, AppState, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';

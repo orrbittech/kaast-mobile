@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "apk",
-    "slug": "apk",
+    "name": "KAAST",
+    "slug": "kaast-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -71,7 +71,14 @@
       ],
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow KAAST to access your photos and videos for media uploads.",
+          "cameraPermission": "Allow KAAST to use the camera for media uploads."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -91,6 +91,9 @@ export interface CreateMediaLibraryItem {
     title?: string;
     duration?: number | null;
     mimeType?: string | null;
+    storageKey?: string | null;
+    fileSizeBytes?: number | null;
+    mediaType?: 'image' | 'video' | 'audio' | null;
 }
 
 /** Update media library item request body */

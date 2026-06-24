@@ -51,3 +51,4 @@ export {
 } from './usePlaylistDeviceStats';
 export { useSendMediaCommand } from './useSendMediaCommand';
 export { useUserProfile } from './useUser';
+export { useSubscriptionStatus } from './useSubscriptionStatus';

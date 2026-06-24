@@ -10,7 +10,11 @@ import {
     Platform,
     RefreshControl,
     Dimensions,
+    Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -31,6 +35,12 @@ import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 import { colors } from '../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../lib/api';
 import { getDisplayTitle, getMediaTypeForFilter } from '../../lib/utils/media';
+import { uploadMediaFile } from '../../lib/media/uploadMediaFile';
+import {
+    MediaUploadPreview,
+    PickMediaButtons,
+    UploadProgressBar,
+} from '../../components/MediaUploadPreview';
 
 /**
  * Media page - browse media derived from playlist items.
@@ -66,13 +76,74 @@ export default function MediaScreen() {
     const [editTitle, setEditTitle] = useState('');
     const [editUrl, setEditUrl] = useState('');
     const [confirmRemoveItem, setConfirmRemoveItem] = useState<MediaItemDisplay | null>(null);
+    const [pickedFile, setPickedFile] = useState<{
+        uri: string;
+        mimeType: string;
+        filename: string;
+        sizeBytes: number;
+    } | null>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [picking, setPicking] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const createMediaItem = useCreateMediaItem(clerkOrgId);
     const updateMediaItem = useUpdateMediaItem(clerkOrgId);
     const deleteMediaItem = useDeleteMediaItem(clerkOrgId);
 
     const addPlaylistItem = useAddPlaylistItem(selectedPlaylistId ?? undefined, clerkOrgId);
-    const isAddingMedia = createMediaItem.isPending || addPlaylistItem.isPending;
+    const isAddingMedia =
+        createMediaItem.isPending || addPlaylistItem.isPending || uploading;
+
+    const pickFromGallery = async () => {
+        setPicking(true);
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images', 'videos'],
+                quality: 1,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            const asset = result.assets[0];
+            const info = await FileSystem.getInfoAsync(asset.uri);
+            setPickedFile({
+                uri: asset.uri,
+                mimeType: asset.mimeType ?? 'application/octet-stream',
+                filename: asset.fileName ?? `upload-${Date.now()}`,
+                sizeBytes: info.exists && 'size' in info ? (info.size ?? 0) : 0,
+            });
+            setAddMediaUrl('');
+        } finally {
+            setPicking(false);
+        }
+    };
+
+    const pickAudio = async () => {
+        setPicking(true);
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'audio/*',
+                copyToCacheDirectory: true,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            const asset = result.assets[0];
+            setPickedFile({
+                uri: asset.uri,
+                mimeType: asset.mimeType ?? 'audio/mpeg',
+                filename: asset.name,
+                sizeBytes: asset.size ?? 0,
+            });
+            setAddMediaUrl('');
+        } finally {
+            setPicking(false);
+        }
+    };
+
+    const resetAddForm = () => {
+        setAddMediaUrl('');
+        setAddTitle('');
+        setSelectedPlaylistId(null);
+        setPickedFile(null);
+        setUploadProgress(0);
+    };
 
     /** Filter media by type (video, audio, image) */
     const typeFilteredMediaItems = mediaItems
@@ -132,11 +203,34 @@ export default function MediaScreen() {
     };
 
     const handleAddMedia = async () => {
-        if (!addMediaUrl.trim()) return;
-        const url = addMediaUrl.trim();
         const title = addTitle.trim() || undefined;
         try {
-            await createMediaItem.mutateAsync({ url, title });
+            let url = addMediaUrl.trim();
+            let mimeType: string | null = null;
+
+            if (pickedFile) {
+                setUploading(true);
+                setUploadProgress(0);
+                const uploaded = await uploadMediaFile({
+                    ...pickedFile,
+                    onProgress: setUploadProgress,
+                });
+                url = uploaded.publicUrl;
+                mimeType = pickedFile.mimeType;
+                setUploading(false);
+
+                await createMediaItem.mutateAsync({
+                    url,
+                    title,
+                    mimeType,
+                    storageKey: uploaded.objectKey,
+                    fileSizeBytes: pickedFile.sizeBytes,
+                    mediaType: uploaded.mediaType,
+                });
+            } else {
+                if (!url) return;
+                await createMediaItem.mutateAsync({ url, title, mimeType });
+            }
             if (selectedPlaylistId) {
                 await addPlaylistItem.mutateAsync({
                     mediaUrl: url,
@@ -144,16 +238,15 @@ export default function MediaScreen() {
                 });
             }
             setAddModalVisible(false);
-            setAddMediaUrl('');
-            setAddTitle('');
-            setSelectedPlaylistId(null);
+            resetAddForm();
         } catch {
-            // Global NetworkErrorHandler shows error
+            setUploading(false);
+            Alert.alert('Upload failed', 'Could not upload media. Try again.');
         }
     };
 
     const openAddModal = () => {
-        setSelectedPlaylistId(null);
+        resetAddForm();
         setAddModalVisible(true);
     };
 
@@ -426,14 +519,26 @@ export default function MediaScreen() {
                         <Text className="text-lg font-sans-semibold text-white mb-4">
                             Add Media
                         </Text>
-                        <KeyboardAvoidingView
-                            behavior={
-                                Platform.OS === 'ios' ? 'padding' : undefined
-                            }
-                        >
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Media URL
-                            </Text>
+                        <PickMediaButtons
+                            onPickGallery={pickFromGallery}
+                            onPickAudio={pickAudio}
+                            picking={picking}
+                        />
+                        {pickedFile ? (
+                            <>
+                                <MediaUploadPreview
+                                    uri={pickedFile.uri}
+                                    mimeType={pickedFile.mimeType}
+                                    onClear={() => setPickedFile(null)}
+                                />
+                                {uploading ? (
+                                    <UploadProgressBar progress={uploadProgress} />
+                                ) : null}
+                            </>
+                        ) : null}
+                        <Text className="text-zinc-400 text-sm mb-2">
+                            Or paste media URL
+                        </Text>
                             <TextInput
                                 value={addMediaUrl}
                                 onChangeText={setAddMediaUrl}
@@ -442,6 +547,11 @@ export default function MediaScreen() {
                                 style={{ fontFamily: 'Urbanist_400Regular' }}
                                 className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
                             />
+                        <KeyboardAvoidingView
+                            behavior={
+                                Platform.OS === 'ios' ? 'padding' : undefined
+                            }
+                        >
                             <Text className="text-zinc-400 text-sm mb-2">
                                 Title (optional)
                             </Text>
@@ -500,7 +610,8 @@ export default function MediaScreen() {
                             <Pressable
                                 onPress={handleAddMedia}
                                 disabled={
-                                    !addMediaUrl.trim() || isAddingMedia
+                                    (!addMediaUrl.trim() && !pickedFile) ||
+                                    isAddingMedia
                                 }
                                 className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
                             >
