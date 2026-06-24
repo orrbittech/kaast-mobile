@@ -1,24 +1,129 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../api";
+import {
+    useQuery,
+    useMutation,
+    useQueryClient,
+} from '@tanstack/react-query';
+import {
+    devicesApi,
+    deviceKeys,
+    locationKeys,
+    type Device,
+    type CreateDevice,
+    type PairDevice,
+} from '../api';
+import { showSuccessNotification } from '../notifications/successNotification';
 
-export interface Device {
-  id: string;
-  deviceId: string;
-  name: string;
-  status: string;
-  lastSeenAt?: string;
+export type { Device };
+
+/** List all devices for an organization. Refetches on app focus and uses 30s stale time. */
+export function useDevices(clerkOrgId: string | undefined) {
+    return useQuery({
+        queryKey: deviceKeys.list(clerkOrgId ?? ''),
+        queryFn: ({ signal }) => devicesApi.list(clerkOrgId, { signal }),
+        enabled: !!clerkOrgId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: true,
+    });
 }
 
-export function useDevices(locationId: string | undefined) {
-  return useQuery({
-    queryKey: ["devices", locationId],
-    queryFn: async () => {
-      if (!locationId) return [];
-      const { data } = await apiClient.get<Device[]>(
-        `/locations/${locationId}/devices`
-      );
-      return data;
-    },
-    enabled: !!locationId,
-  });
+/** Single device by UUID. Used for control screen and device detail. */
+export function useDevice(id: string | undefined) {
+    return useQuery({
+        queryKey: deviceKeys.detail(id ?? ''),
+        queryFn: ({ signal }) => devicesApi.getById(id!, { signal }),
+        enabled: !!id,
+        staleTime: 15_000,
+        refetchOnWindowFocus: true,
+    });
+}
+
+/** Create device. Org from token. Pass clerkOrgId for org-scoped JWT. */
+export function useCreateDevice(clerkOrgId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (body: CreateDevice) => devicesApi.create(body, clerkOrgId),
+        onSuccess: (data) => {
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
+                    old ? [...old, data] : [data],
+                );
+            }
+            showSuccessNotification('Device created', data.name);
+        },
+    });
+}
+
+/** Update device. Optimistically updates list cache. */
+export function useUpdateDevice(clerkOrgId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            id,
+            body,
+        }: {
+            id: string;
+            body: Partial<{ name: string; status: string; locationId: string | null; activePlaylistId: string | null }>;
+        }) => devicesApi.update(id, body),
+        onSuccess: (data, variables) => {
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
+                    old
+                        ? old.map((d) => (d.id === variables.id ? { ...d, ...data } : d))
+                        : [],
+                );
+            }
+            queryClient.setQueryData(deviceKeys.detail(variables.id), (old: Device | undefined) =>
+                old ? { ...old, ...data } : old,
+            );
+            showSuccessNotification('Device updated', data.name);
+        },
+    });
+}
+
+/** Delete device. Optimistically removes from list and detail cache. */
+export function useDeleteDevice(clerkOrgId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => devicesApi.delete(id),
+        onSuccess: (_, id) => {
+            queryClient.removeQueries({ queryKey: deviceKeys.detail(id) });
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
+                    old ? old.filter((d) => d.id !== id) : [],
+                );
+            }
+            showSuccessNotification('Device deleted');
+        },
+    });
+}
+
+/** Pair device with 6-digit code. Org from token. */
+export function usePairDevice(clerkOrgId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (body: PairDevice) => devicesApi.pair(body, clerkOrgId),
+        onSuccess: (data) => {
+            if (clerkOrgId) {
+                queryClient.setQueryData(deviceKeys.list(clerkOrgId), (old: Device[] | undefined) =>
+                    old ? [...old, data.device] : [data.device],
+                );
+                void queryClient.invalidateQueries({
+                    queryKey: locationKeys.list(clerkOrgId),
+                });
+            }
+            showSuccessNotification('Device paired', data.device.name);
+        },
+    });
+}
+
+/** Generate pairing code for TV device. */
+export function useGeneratePairingCode() {
+    return useMutation({
+        mutationFn: (deviceId: string) =>
+            devicesApi.generatePairingCode(deviceId),
+    });
 }

@@ -1,20 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../api";
+import { useQuery } from '@tanstack/react-query';
+import { usersApi, type UserProfile } from '../api';
 
-export interface UserProfile {
-  id: string;
-  clerkUserId: string;
-  email?: string;
-  name?: string;
-  imageUrl?: string;
-}
+export type { UserProfile };
 
 export function useUserProfile() {
-  return useQuery({
-    queryKey: ["user", "me"],
-    queryFn: async () => {
-      const { data } = await apiClient.get<UserProfile>("/users/me");
-      return data;
-    },
-  });
+    return useQuery({
+        queryKey: ['user', 'me'],
+        queryFn: () => usersApi.getMe(),
+    });
 }

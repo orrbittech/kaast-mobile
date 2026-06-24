@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect } from 'expo-router';
 
 /**
  * Reset password - Clerk handles reset via email link.
@@ -6,5 +6,5 @@ import { Redirect } from "expo-router";
  * For now, redirect to forgot-password for the code-based flow.
  */
 export default function ResetPasswordScreen() {
-  return <Redirect href="/forgot-password" />;
+    return <Redirect href="/forgot-password" />;
 }
