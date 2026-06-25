@@ -10,6 +10,8 @@ import { usersApi } from '../../lib/api/services/users.api';
 import { Text } from '../../components/ui/Text';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 import { useActiveOrgContext } from '../../lib/hooks';
+import { useSubscriptionGate } from '../../lib/context/SubscriptionContext';
+import { formatPlanDisplayName } from '../../lib/billing-config';
 import {
     AccountPortalConfigError,
     openAccountPortalBillingAsync,
@@ -18,6 +20,13 @@ import {
 
 const PRIVACY_URL = 'https://kaast.app/privacy';
 const TERMS_URL = 'https://kaast.app/terms';
+
+function formatTrialEnd(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString();
+}
 
 /**
  * Settings screen - app preferences, Clerk account/security, data rights, and sign out.
@@ -28,6 +37,13 @@ export default function SettingsScreen() {
     const { signOut } = useClerk();
     const { userOwnsCredentials, clearCredentials } = useLocalCredentials();
     const { clerkOrgId, org } = useActiveOrgContext();
+    const {
+        planSlug,
+        status,
+        trialEndsAt,
+        isActive,
+        isLoading: subscriptionLoading,
+    } = useSubscriptionGate();
     const isOrgAdmin = org?.role === 'org:admin';
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
@@ -125,6 +141,23 @@ export default function SettingsScreen() {
                     Manage your account and preferences
                 </Text>
 
+                {!subscriptionLoading ? (
+                    <View className="p-4 rounded-xl bg-zinc-800 mb-4">
+                        <Text className="font-sans-medium text-white mb-1">
+                            Subscription
+                        </Text>
+                        <Text className="text-sm text-zinc-300">
+                            Plan: {formatPlanDisplayName(planSlug)}
+                        </Text>
+                        <Text className="text-sm text-zinc-400 mt-1">
+                            Status: {isActive ? status : 'inactive'}
+                            {trialEndsAt
+                                ? ` · Trial ends ${formatTrialEnd(trialEndsAt)}`
+                                : null}
+                        </Text>
+                    </View>
+                ) : null}
+
                 <View className="gap-4">
                     <Pressable
                         onPress={openAccountPortal}
@@ -164,7 +197,9 @@ export default function SettingsScreen() {
                         </View>
                         <Text className="text-sm text-zinc-400 mt-1">
                             {isOrgAdmin
-                                ? 'Manage subscription and trial'
+                                ? isActive
+                                    ? `Manage your ${formatPlanDisplayName(planSlug)} subscription`
+                                    : 'Manage subscription and trial'
                                 : 'Only organization admins can manage billing'}
                         </Text>
                     </Pressable>

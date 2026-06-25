@@ -167,6 +167,93 @@ export const releaseConfirmBodySchema = z.object({
   pin: z.string().regex(/^\d{6}$/),
 });
 
+const timeStringSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Expected HH:MM or HH:MM:SS");
+
+const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+
+export const repeatTypeSchema = z.enum(["none", "daily", "weekly", "custom"]);
+export const deviceTargetModeSchema = z.enum(["all", "include", "exclude"]);
+export const schedulePrioritySchema = z.enum(["low", "medium", "high"]);
+
+function parseTimeToMinutes(time: string): number {
+  const parts = time.split(":");
+  return Number(parts[0]) * 60 + Number(parts[1]);
+}
+
+export const createPlaylistScheduleFormSchema = z
+  .object({
+    startTime: timeStringSchema,
+    endTime: timeStringSchema,
+    startDate: dateStringSchema,
+    endDate: z.string().optional(),
+    repeatType: repeatTypeSchema.default("daily"),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
+    timezone: z.string().min(1).default("UTC"),
+    priority: schedulePrioritySchema.default("medium"),
+    enabled: z.boolean().default(true),
+    loopPlaylist: z.boolean().default(true),
+    deviceTargetMode: deviceTargetModeSchema.default("all"),
+    deviceIds: z.array(z.string().min(1)).default([]),
+  })
+  .superRefine((data, ctx) => {
+    const startMinutes = parseTimeToMinutes(data.startTime);
+    const endMinutes = parseTimeToMinutes(data.endTime);
+    if (startMinutes === endMinutes) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Start and end time cannot be the same",
+        path: ["endTime"],
+      });
+    }
+
+    const trimmedEndDate = data.endDate?.trim();
+    if (trimmedEndDate && trimmedEndDate < data.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End date must be on or after start date",
+        path: ["endDate"],
+      });
+    }
+
+    if (
+      (data.repeatType === "weekly" || data.repeatType === "custom") &&
+      data.daysOfWeek.length === 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select at least one day",
+        path: ["daysOfWeek"],
+      });
+    }
+
+    if (
+      (data.deviceTargetMode === "include" ||
+        data.deviceTargetMode === "exclude") &&
+      data.deviceIds.length === 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select at least one device",
+        path: ["deviceIds"],
+      });
+    }
+  });
+
+export const createPlaylistFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  locationId: z.string().uuid().nullable().optional(),
+  schedule: createPlaylistScheduleFormSchema,
+});
+
+export type CreatePlaylistScheduleFormValues = z.infer<
+  typeof createPlaylistScheduleFormSchema
+>;
+export type CreatePlaylistFormValues = z.infer<typeof createPlaylistFormSchema>;
+
 export type Location = z.infer<typeof locationSchema>;
 export type WashPackage = z.infer<typeof washPackageSchema>;
 export type Vehicle = z.infer<typeof vehicleSchema>;

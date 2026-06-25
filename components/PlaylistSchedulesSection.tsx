@@ -3,11 +3,11 @@ import {
     View,
     Pressable,
     Modal,
-    TextInput,
     ActivityIndicator,
     ScrollView,
     Switch,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
     usePlaylistSchedules,
@@ -19,36 +19,27 @@ import {
 } from '../lib/hooks';
 import type {
     CreatePlaylistSchedule,
-    DeviceTargetMode,
     PlaylistSchedule,
-    RepeatType,
 } from '../lib/api/types';
+import {
+    PlaylistScheduleFormFields,
+    SCHEDULE_FORM_APPROVE_HEX,
+    type PlaylistScheduleFormState,
+} from './PlaylistScheduleFormFields';
 import { Text } from './ui/Text';
 import { ConfirmModal } from './ConfirmModal';
 import { colors } from '../lib/theme/colors';
-
-const APPROVE_HEX = '#16a34a';
-
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
-    { value: 'none', label: 'Once' },
-    { value: 'daily', label: 'Daily' },
-    { value: 'weekly', label: 'Weekly' },
-    { value: 'custom', label: 'Custom days' },
-];
-const TARGET_OPTIONS: { value: DeviceTargetMode; label: string }[] = [
-    { value: 'all', label: 'All devices' },
-    { value: 'include', label: 'Include only' },
-    { value: 'exclude', label: 'Exclude selected' },
-];
+import {
+    formatTimeLabel,
+    formatPriorityLabel,
+    normalizeSchedulePriority,
+} from '../lib/constants/playlist-form';
 
 function todayDateString(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
-function formatTimeLabel(time: string): string {
-    return time.slice(0, 5);
-}
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatRepeatLabel(schedule: PlaylistSchedule): string {
     if (schedule.repeatType === 'none') return 'Once';
@@ -61,21 +52,7 @@ function formatRepeatLabel(schedule: PlaylistSchedule): string {
         .join(', ');
 }
 
-interface ScheduleFormState {
-    startTime: string;
-    endTime: string;
-    startDate: string;
-    endDate: string;
-    repeatType: RepeatType;
-    daysOfWeek: number[];
-    priority: string;
-    enabled: boolean;
-    loopPlaylist: boolean;
-    deviceTargetMode: DeviceTargetMode;
-    deviceIds: string[];
-}
-
-function defaultFormState(): ScheduleFormState {
+function defaultFormState(): PlaylistScheduleFormState {
     return {
         startTime: '09:00',
         endTime: '17:00',
@@ -83,7 +60,8 @@ function defaultFormState(): ScheduleFormState {
         endDate: '',
         repeatType: 'daily',
         daysOfWeek: [],
-        priority: '0',
+        timezone: 'UTC',
+        priority: 'medium',
         enabled: true,
         loopPlaylist: true,
         deviceTargetMode: 'all',
@@ -91,7 +69,7 @@ function defaultFormState(): ScheduleFormState {
     };
 }
 
-function scheduleToForm(schedule: PlaylistSchedule): ScheduleFormState {
+function scheduleToForm(schedule: PlaylistSchedule): PlaylistScheduleFormState {
     return {
         startTime: formatTimeLabel(schedule.startTime),
         endTime: formatTimeLabel(schedule.endTime),
@@ -99,7 +77,8 @@ function scheduleToForm(schedule: PlaylistSchedule): ScheduleFormState {
         endDate: schedule.endDate ?? '',
         repeatType: schedule.repeatType,
         daysOfWeek: schedule.daysOfWeek ?? [],
-        priority: String(schedule.priority),
+        timezone: schedule.timezone,
+        priority: normalizeSchedulePriority(schedule.priority),
         enabled: schedule.enabled,
         loopPlaylist: schedule.loopPlaylist,
         deviceTargetMode: schedule.deviceTargetMode,
@@ -107,18 +86,19 @@ function scheduleToForm(schedule: PlaylistSchedule): ScheduleFormState {
     };
 }
 
-function formToPayload(form: ScheduleFormState): CreatePlaylistSchedule {
+function formToPayload(form: PlaylistScheduleFormState): CreatePlaylistSchedule {
     return {
         startTime: form.startTime,
         endTime: form.endTime,
         startDate: form.startDate,
-        endDate: form.endDate.trim() ? form.endDate.trim() : null,
+        endDate: form.endDate?.trim() ? form.endDate.trim() : null,
         repeatType: form.repeatType,
         daysOfWeek:
             form.repeatType === 'weekly' || form.repeatType === 'custom'
                 ? form.daysOfWeek
                 : [],
-        priority: Number(form.priority) || 0,
+        timezone: form.timezone,
+        priority: form.priority,
         enabled: form.enabled,
         loopPlaylist: form.loopPlaylist,
         deviceTargetMode: form.deviceTargetMode,
@@ -132,6 +112,7 @@ interface PlaylistSchedulesSectionProps {
 }
 
 export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectionProps) {
+    const insets = useSafeAreaInsets();
     const { clerkOrgId } = useActiveOrgContext();
     const { data: schedules, isLoading } = usePlaylistSchedules(playlistId);
     const { data: devices } = useDevices(clerkOrgId);
@@ -142,7 +123,7 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<PlaylistSchedule | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<PlaylistSchedule | null>(null);
-    const [form, setForm] = useState<ScheduleFormState>(defaultFormState);
+    const [form, setForm] = useState<PlaylistScheduleFormState>(defaultFormState);
 
     const sortedSchedules = useMemo(
         () => [...(schedules ?? [])].sort((a, b) => a.startTime.localeCompare(b.startTime)),
@@ -159,6 +140,13 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
         setEditingSchedule(schedule);
         setForm(scheduleToForm(schedule));
         setModalVisible(true);
+    };
+
+    const setScheduleField = <K extends keyof PlaylistScheduleFormState>(
+        key: K,
+        value: PlaylistScheduleFormState[K],
+    ) => {
+        setForm((current) => ({ ...current, [key]: value }));
     };
 
     const toggleDay = (day: number) => {
@@ -224,9 +212,6 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
     };
 
     const isSaving = createSchedule.isPending || updateSchedule.isPending;
-    const showDayPicker =
-        form.repeatType === 'weekly' || form.repeatType === 'custom';
-    const showDevicePicker = form.deviceTargetMode !== 'all';
 
     return (
         <View className="mt-8">
@@ -236,7 +221,7 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
                     onPress={openCreateModal}
                     className="flex-row items-center gap-1 py-1 px-2 rounded-lg bg-zinc-800 active:opacity-80"
                 >
-                    <Ionicons name="add" size={16} color={APPROVE_HEX} />
+                    <Ionicons name="add" size={16} color={SCHEDULE_FORM_APPROVE_HEX} />
                     <Text className="text-approve text-sm font-sans-medium">Add slot</Text>
                 </Pressable>
             </View>
@@ -275,7 +260,7 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
                                     {formatTimeLabel(schedule.endTime)}
                                 </Text>
                                 <Text className="text-zinc-300 text-sm mt-1">
-                                    {formatRepeatLabel(schedule)} · priority {schedule.priority}
+                                    {formatRepeatLabel(schedule)} · {formatPriorityLabel(schedule.priority)} priority
                                 </Text>
                                 <Text className="text-zinc-400 text-xs mt-1">
                                     {schedule.deviceTargetMode === 'all'
@@ -286,7 +271,7 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
                             <Switch
                                 value={schedule.enabled}
                                 onValueChange={() => void handleToggleEnabled(schedule)}
-                                trackColor={{ false: '#3f3f46', true: APPROVE_HEX }}
+                                trackColor={{ false: '#3f3f46', true: SCHEDULE_FORM_APPROVE_HEX }}
                             />
                         </View>
                         <View className="flex-row gap-2 mt-3">
@@ -316,161 +301,23 @@ export function PlaylistSchedulesSection({ playlistId }: PlaylistSchedulesSectio
                 onRequestClose={() => setModalVisible(false)}
             >
                 <View className="flex-1 bg-black/60 justify-end">
-                    <View className="max-h-[90%] rounded-t-3xl bg-zinc-900 p-6">
+                    <View className="max-h-[90%] rounded-t-3xl bg-zinc-900 px-6 pt-6">
                         <Text className="text-lg font-sans-semibold text-white mb-4">
                             {editingSchedule ? 'Edit schedule slot' : 'New schedule slot'}
                         </Text>
                         <ScrollView showsVerticalScrollIndicator={false}>
-                            <Text className="text-zinc-400 text-sm mb-2">Start time (HH:MM)</Text>
-                            <TextInput
-                                value={form.startTime}
-                                onChangeText={(startTime) => setForm((f) => ({ ...f, startTime }))}
-                                placeholder="09:00"
-                                placeholderTextColor="#71717a"
-                                className="bg-zinc-800 rounded-xl px-4 py-3 text-white mb-4"
+                            <PlaylistScheduleFormFields
+                                form={form}
+                                devices={devices}
+                                onChange={setScheduleField}
+                                onToggleDay={toggleDay}
+                                onToggleDevice={toggleDevice}
                             />
-                            <Text className="text-zinc-400 text-sm mb-2">End time (HH:MM)</Text>
-                            <TextInput
-                                value={form.endTime}
-                                onChangeText={(endTime) => setForm((f) => ({ ...f, endTime }))}
-                                placeholder="17:00"
-                                placeholderTextColor="#71717a"
-                                className="bg-zinc-800 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <Text className="text-zinc-400 text-sm mb-2">Start date</Text>
-                            <TextInput
-                                value={form.startDate}
-                                onChangeText={(startDate) => setForm((f) => ({ ...f, startDate }))}
-                                placeholder="YYYY-MM-DD"
-                                placeholderTextColor="#71717a"
-                                className="bg-zinc-800 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <Text className="text-zinc-400 text-sm mb-2">End date (optional)</Text>
-                            <TextInput
-                                value={form.endDate}
-                                onChangeText={(endDate) => setForm((f) => ({ ...f, endDate }))}
-                                placeholder="YYYY-MM-DD"
-                                placeholderTextColor="#71717a"
-                                className="bg-zinc-800 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <Text className="text-zinc-400 text-sm mb-2">Repeat</Text>
-                            <View className="flex-row flex-wrap gap-2 mb-4">
-                                {REPEAT_OPTIONS.map((option) => (
-                                    <Pressable
-                                        key={option.value}
-                                        onPress={() =>
-                                            setForm((f) => ({ ...f, repeatType: option.value }))
-                                        }
-                                        className={`px-3 py-2 rounded-lg ${
-                                            form.repeatType === option.value
-                                                ? 'bg-approve'
-                                                : 'bg-zinc-800'
-                                        }`}
-                                    >
-                                        <Text className="text-white text-sm">{option.label}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                            {showDayPicker && (
-                                <View className="mb-4">
-                                    <Text className="text-zinc-400 text-sm mb-2">Days</Text>
-                                    <View className="flex-row flex-wrap gap-2">
-                                        {WEEKDAY_LABELS.map((label, index) => (
-                                            <Pressable
-                                                key={label}
-                                                onPress={() => toggleDay(index)}
-                                                className={`px-3 py-2 rounded-lg ${
-                                                    form.daysOfWeek.includes(index)
-                                                        ? 'bg-approve'
-                                                        : 'bg-zinc-800'
-                                                }`}
-                                            >
-                                                <Text className="text-white text-sm">{label}</Text>
-                                            </Pressable>
-                                        ))}
-                                    </View>
-                                </View>
-                            )}
-                            <Text className="text-zinc-400 text-sm mb-2">Priority</Text>
-                            <TextInput
-                                value={form.priority}
-                                onChangeText={(priority) => setForm((f) => ({ ...f, priority }))}
-                                keyboardType="number-pad"
-                                placeholder="0"
-                                placeholderTextColor="#71717a"
-                                className="bg-zinc-800 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <View className="flex-row items-center justify-between mb-4">
-                                <Text className="text-zinc-300">Loop playlist</Text>
-                                <Switch
-                                    value={form.loopPlaylist}
-                                    onValueChange={(loopPlaylist) =>
-                                        setForm((f) => ({ ...f, loopPlaylist }))
-                                    }
-                                    trackColor={{ false: '#3f3f46', true: APPROVE_HEX }}
-                                />
-                            </View>
-                            <View className="flex-row items-center justify-between mb-4">
-                                <Text className="text-zinc-300">Enabled</Text>
-                                <Switch
-                                    value={form.enabled}
-                                    onValueChange={(enabled) => setForm((f) => ({ ...f, enabled }))}
-                                    trackColor={{ false: '#3f3f46', true: APPROVE_HEX }}
-                                />
-                            </View>
-                            <Text className="text-zinc-400 text-sm mb-2">Device targeting</Text>
-                            <View className="flex-row flex-wrap gap-2 mb-4">
-                                {TARGET_OPTIONS.map((option) => (
-                                    <Pressable
-                                        key={option.value}
-                                        onPress={() =>
-                                            setForm((f) => ({
-                                                ...f,
-                                                deviceTargetMode: option.value,
-                                            }))
-                                        }
-                                        className={`px-3 py-2 rounded-lg ${
-                                            form.deviceTargetMode === option.value
-                                                ? 'bg-approve'
-                                                : 'bg-zinc-800'
-                                        }`}
-                                    >
-                                        <Text className="text-white text-sm">{option.label}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                            {showDevicePicker && (
-                                <View className="mb-4">
-                                    <Text className="text-zinc-400 text-sm mb-2">Devices</Text>
-                                    <View className="gap-2">
-                                        {devices?.map((device) => {
-                                            const selected = form.deviceIds.includes(
-                                                device.deviceId,
-                                            );
-                                            return (
-                                                <Pressable
-                                                    key={device.id}
-                                                    onPress={() => toggleDevice(device.deviceId)}
-                                                    className={`rounded-xl px-4 py-3 flex-row items-center justify-between ${
-                                                        selected ? 'bg-approve/20' : 'bg-zinc-800'
-                                                    }`}
-                                                >
-                                                    <Text className="text-white">{device.name}</Text>
-                                                    {selected && (
-                                                        <Ionicons
-                                                            name="checkmark-circle"
-                                                            size={20}
-                                                            color={APPROVE_HEX}
-                                                        />
-                                                    )}
-                                                </Pressable>
-                                            );
-                                        })}
-                                    </View>
-                                </View>
-                            )}
                         </ScrollView>
-                        <View className="flex-row gap-3 mt-4">
+                        <View
+                            className="flex-row gap-3 mt-4"
+                            style={{ paddingBottom: insets.bottom + 12 }}
+                        >
                             <Pressable
                                 onPress={() => setModalVisible(false)}
                                 className="flex-1 py-3 rounded-xl bg-zinc-800 items-center"
