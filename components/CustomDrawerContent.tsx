@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { invalidateOnSignOut } from '../lib/api/invalidate';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
+import { ModalCloseButton } from './ModalCloseButton';
 import { Text } from './ui/Text';
 import { colors } from '../lib/theme/colors';
 
@@ -46,19 +47,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                 >
                     <View className="flex-row items-center justify-between px-4 py-6">
                         <View>
-                            <Text className="text-xl font-sans-semibold text-white">
+                            <Text className="text-xl font-sans-semibold text-primary">
                                 Kaast
                             </Text>
                             <Text className="text-sm text-zinc-400 mt-1">
                                 Media Control
                             </Text>
                         </View>
-                        <Pressable
-                            onPress={() => props.navigation.closeDrawer()}
-                            className="w-10 h-10 rounded-full bg-zinc-700 items-center justify-center active:opacity-80"
-                        >
-                            <Ionicons name="close" size={24} color="#ffffff" />
-                        </Pressable>
+                        <ModalCloseButton onPress={() => props.navigation.closeDrawer()} />
                     </View>
                     <DrawerItemList {...props} />
                 </DrawerContentScrollView>

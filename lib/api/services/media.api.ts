@@ -6,6 +6,7 @@ import type {
     MediaLibraryItem,
     CreateMediaLibraryItem,
     UpdateMediaLibraryItem,
+    MediaLibraryUsage,
 } from '../types';
 
 export const mediaApi = {
@@ -49,6 +50,13 @@ export const mediaApi = {
             `/media/library/${id}`,
         );
         return data ?? { deleted: true };
+    },
+
+    getLibraryItemUsage: async (id: string): Promise<MediaLibraryUsage> => {
+        const { data } = await apiClient.get<MediaLibraryUsage>(
+            `/media/library/${id}/usage`,
+        );
+        return data;
     },
 
     getSession: async (

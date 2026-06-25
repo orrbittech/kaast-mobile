@@ -8,6 +8,9 @@ import type { PlaylistDeviceStats } from '../lib/hooks/usePlaylistDeviceStats';
 const APPROVE_HEX = '#16a34a';
 const ZINC_HEX = '#71717a';
 const CHART_CARD_WIDTH = 168;
+const MEDIA_TYPES_CARD_WIDTH = CHART_CARD_WIDTH * 2;
+/** Matches app dark base — donut hole instead of default white */
+const DONUT_INNER_COLOR = '#171717';
 
 interface PlaylistStatsChartsProps {
     stats: Pick<
@@ -25,14 +28,16 @@ interface PlaylistStatsChartsProps {
 function ChartCard({
     title,
     children,
+    width = CHART_CARD_WIDTH,
 }: {
     title: string;
     children: ReactNode;
+    width?: number;
 }) {
     return (
         <View
             className="rounded-xl bg-zinc-800 p-4 mr-3"
-            style={{ width: CHART_CARD_WIDTH }}
+            style={{ width }}
         >
             <Text className="text-zinc-200 text-xs mb-3 font-sans-medium">{title}</Text>
             {children}
@@ -130,7 +135,7 @@ export function PlaylistStatsCharts({ stats, isLoading }: PlaylistStatsChartsPro
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingRight: Math.max(0, screenWidth - CHART_CARD_WIDTH - 48) }}
+                contentContainerStyle={{ paddingRight: Math.max(0, screenWidth - MEDIA_TYPES_CARD_WIDTH - 48) }}
             >
                 <ChartCard title="Playback">
                     {assignedTotal === 0 ? (
@@ -142,6 +147,9 @@ export function PlaylistStatsCharts({ stats, isLoading }: PlaylistStatsChartsPro
                                 radius={52}
                                 innerRadius={32}
                                 donut
+                                innerCircleColor={DONUT_INNER_COLOR}
+                                strokeColor={DONUT_INNER_COLOR}
+                                strokeWidth={4}
                                 centerLabelComponent={() => (
                                     <View className="items-center">
                                         <Text className="text-white text-sm font-sans-semibold">
@@ -175,6 +183,9 @@ export function PlaylistStatsCharts({ stats, isLoading }: PlaylistStatsChartsPro
                                 radius={52}
                                 innerRadius={32}
                                 donut
+                                innerCircleColor={DONUT_INNER_COLOR}
+                                strokeColor={DONUT_INNER_COLOR}
+                                strokeWidth={4}
                                 centerLabelComponent={() => (
                                     <View className="items-center">
                                         <Text className="text-white text-sm font-sans-semibold">
@@ -198,15 +209,15 @@ export function PlaylistStatsCharts({ stats, isLoading }: PlaylistStatsChartsPro
                     )}
                 </ChartCard>
 
-                <ChartCard title="Media types">
+                <ChartCard title="Media types" width={MEDIA_TYPES_CARD_WIDTH}>
                     {itemTotal === 0 ? (
                         <EmptyChartPlaceholder message="No items in playlist" />
                     ) : (
                         <View className="items-center">
                             <BarChart
                                 data={barData}
-                                barWidth={22}
-                                spacing={14}
+                                barWidth={28}
+                                spacing={24}
                                 roundedTop
                                 roundedBottom
                                 hideRules
@@ -216,7 +227,7 @@ export function PlaylistStatsCharts({ stats, isLoading }: PlaylistStatsChartsPro
                                 noOfSections={3}
                                 maxValue={maxBarValue}
                                 height={100}
-                                width={130}
+                                width={MEDIA_TYPES_CARD_WIDTH - 48}
                                 xAxisLabelTextStyle={{
                                     color: ZINC_HEX,
                                     fontSize: 10,

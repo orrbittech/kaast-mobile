@@ -116,6 +116,10 @@ export default function RootLayout() {
                         name="(drawer)"
                         options={{ headerShown: false }}
                     />
+                    <Stack.Screen
+                        name="billing-callback"
+                        options={{ headerShown: false }}
+                    />
                 </Stack>
             </ClerkProvider>
         </QueryClientProvider>

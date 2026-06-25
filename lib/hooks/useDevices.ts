@@ -12,15 +12,17 @@ import {
     type PairDevice,
 } from '../api';
 import { showSuccessNotification } from '../notifications/successNotification';
+import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
 
 export type { Device };
 
 /** List all devices for an organization. Refetches on app focus and uses 30s stale time. */
 export function useDevices(clerkOrgId: string | undefined) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: deviceKeys.list(clerkOrgId ?? ''),
         queryFn: ({ signal }) => devicesApi.list(clerkOrgId, { signal }),
-        enabled: !!clerkOrgId,
+        enabled: !!clerkOrgId && queriesEnabled,
         staleTime: 30_000,
         refetchOnWindowFocus: true,
     });
@@ -28,10 +30,11 @@ export function useDevices(clerkOrgId: string | undefined) {
 
 /** Single device by UUID. Used for control screen and device detail. */
 export function useDevice(id: string | undefined) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: deviceKeys.detail(id ?? ''),
         queryFn: ({ signal }) => devicesApi.getById(id!, { signal }),
-        enabled: !!id,
+        enabled: !!id && queriesEnabled,
         staleTime: 15_000,
         refetchOnWindowFocus: true,
     });

@@ -10,6 +10,7 @@ import {
     getMediaTypeForFilter,
     type MediaFilterType,
 } from '../utils/media';
+import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
 
 export interface MediaTypeCounts {
     video: number;
@@ -52,10 +53,11 @@ export function usePlaylistDeviceStats(
     _clerkOrgId: string | undefined,
     playlistItems?: PlaylistItem[],
 ): PlaylistDeviceStats {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     const { data: assignedDevices, isLoading } = useQuery({
         queryKey: playlistKeys.devices(playlistId ?? ''),
         queryFn: ({ signal }) => playlistsApi.getDevices(playlistId!, { signal }),
-        enabled: !!playlistId,
+        enabled: !!playlistId && queriesEnabled,
         refetchInterval: 5_000,
         staleTime: 4_000,
     });

@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/clerk-expo';
 import { useClerkOrganizations } from './useClerkOrganizations';
 import { useLocations } from './useLocations';
 
@@ -5,7 +6,7 @@ export interface ActiveOrgContext {
     clerkOrgId: string | undefined;
     firstLocationId: string | undefined;
     locations: ReturnType<typeof useLocations>['data'];
-    org: ReturnType<typeof useClerkOrganizations>['firstOrg'];
+    org: ReturnType<typeof useClerkOrganizations>['orgs'][number] | undefined;
     isLoading: boolean;
     isRefetching: boolean;
     error: Error | null;
@@ -14,17 +15,24 @@ export interface ActiveOrgContext {
 
 /**
  * Resolves the active organization and first location for org-scoped screens.
- * Mount once at drawer layout to prefetch shared context.
+ * Prefers Clerk's active org (`useAuth().orgId`) over the first membership.
  */
 export function useActiveOrgContext(): ActiveOrgContext {
+    const { orgId: activeOrgId, isLoaded: authLoaded } = useAuth();
     const {
+        orgs,
         firstOrg,
         isLoading: orgsLoading,
         isRefetching: orgsRefetching,
         error: orgsError,
         refetch: refetchOrgs,
     } = useClerkOrganizations();
-    const clerkOrgId = firstOrg?.clerkOrgId;
+
+    const org =
+        orgs.find((membership) => membership.clerkOrgId === activeOrgId) ??
+        firstOrg;
+    const clerkOrgId = activeOrgId ?? org?.clerkOrgId;
+
     const {
         data: locations,
         isLoading: locationsLoading,
@@ -38,8 +46,8 @@ export function useActiveOrgContext(): ActiveOrgContext {
         clerkOrgId,
         firstLocationId,
         locations,
-        org: firstOrg,
-        isLoading: orgsLoading,
+        org,
+        isLoading: !authLoaded || orgsLoading,
         isRefetching: orgsRefetching || locationsRefetching,
         error: (orgsError ?? locationsError) as Error | null,
         refetch: async () => {
