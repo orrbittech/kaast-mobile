@@ -13,6 +13,7 @@ import { invalidateOnSignOut } from '../lib/api/invalidate';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { Text } from './ui/Text';
+import { colors } from '../lib/theme/colors';
 
 /**
  * Custom drawer content - logo, nav items, sign out and app version at bottom.
@@ -73,8 +74,9 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                                 color={color}
                             />
                         )}
-                        inactiveTintColor="#e4e4e7"
-                        activeTintColor="#ffffff"
+                        inactiveTintColor={colors.primaryHex}
+                        activeTintColor={colors.primaryHex}
+                        activeBackgroundColor="transparent"
                         labelStyle={{ fontFamily: 'Urbanist_500Medium' }}
                     />
                     <Text className="text-center text-zinc-500 text-xs pb-4">

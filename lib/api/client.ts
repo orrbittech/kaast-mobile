@@ -38,9 +38,33 @@ export const apiClient = axios.create({
 /** Normalized API error for consistent handling */
 export interface ApiError {
     message: string;
-    code: 'NETWORK_ERROR' | 'UNAUTHORIZED' | 'CLIENT_ERROR' | 'SERVER_ERROR';
+    code:
+        | 'NETWORK_ERROR'
+        | 'UNAUTHORIZED'
+        | 'CLIENT_ERROR'
+        | 'SERVER_ERROR'
+        | 'SUBSCRIPTION_REQUIRED';
     status?: number;
     data?: unknown;
+}
+
+function parseResponseMessage(data: unknown): string | undefined {
+    if (!data || typeof data !== 'object' || !('message' in data)) {
+        return undefined;
+    }
+    const msg = (data as { message?: string | string[] }).message;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg.join(', ');
+    return undefined;
+}
+
+function isSubscriptionRequiredPayload(data: unknown): boolean {
+    return (
+        typeof data === 'object' &&
+        data !== null &&
+        'code' in data &&
+        (data as { code?: string }).code === 'SUBSCRIPTION_REQUIRED'
+    );
 }
 
 function toApiError(error: AxiosError): ApiError {
@@ -59,15 +83,21 @@ function toApiError(error: AxiosError): ApiError {
     }
     const status = error.response.status;
     const data = error.response.data;
-    let message = error.message;
-    if (data && typeof data === 'object' && 'message' in data) {
-        const msg = (data as { message?: string | string[] }).message;
-        message = Array.isArray(msg)
-            ? msg.join(', ')
-            : String(msg ?? message);
+
+    if (status === 403 && isSubscriptionRequiredPayload(data)) {
+        return {
+            message:
+                parseResponseMessage(data) ??
+                'Active subscription or trial required.',
+            code: 'SUBSCRIPTION_REQUIRED',
+            status: 403,
+            data,
+        };
     }
+
+    const parsedMessage = parseResponseMessage(data);
     return {
-        message: message ?? `Request failed with status ${status}`,
+        message: parsedMessage ?? error.message ?? `Request failed with status ${status}`,
         code: status >= 500 ? 'SERVER_ERROR' : 'CLIENT_ERROR',
         status,
         data,

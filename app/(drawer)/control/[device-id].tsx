@@ -58,8 +58,8 @@ function getItemTitle(item: PlaylistItem): string {
  */
 export default function ControlScreen() {
     const insets = useSafeAreaInsets();
-    const { deviceId: deviceIdParam } = useLocalSearchParams<{
-        deviceId: string;
+    const { 'device-id': deviceIdParam } = useLocalSearchParams<{
+        'device-id': string;
     }>();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 

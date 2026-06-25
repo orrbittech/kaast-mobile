@@ -1,7 +1,6 @@
 import { View, Pressable, Alert, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { useClerk } from '@clerk/clerk-expo';
@@ -10,11 +9,15 @@ import { invalidateOnSignOut } from '../../lib/api/invalidate';
 import { usersApi } from '../../lib/api/services/users.api';
 import { Text } from '../../components/ui/Text';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
+import { useActiveOrgContext } from '../../lib/hooks';
+import {
+    AccountPortalConfigError,
+    openAccountPortalBillingAsync,
+    openAccountPortalProfileAsync,
+} from '../../lib/openAccountPortal';
 
-const accountPortalUrl = process.env.EXPO_PUBLIC_CLERK_ACCOUNT_PORTAL_URL;
 const PRIVACY_URL = 'https://kaast.app/privacy';
 const TERMS_URL = 'https://kaast.app/terms';
-const BILLING_URL = 'https://kaast.app/billing';
 
 /**
  * Settings screen - app preferences, Clerk account/security, data rights, and sign out.
@@ -24,6 +27,8 @@ export default function SettingsScreen() {
     const router = useRouter();
     const { signOut } = useClerk();
     const { userOwnsCredentials, clearCredentials } = useLocalCredentials();
+    const { clerkOrgId, org } = useActiveOrgContext();
+    const isOrgAdmin = org?.role === 'org:admin';
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
     const onRemoveBiometricCredentials = async () => {
@@ -35,15 +40,29 @@ export default function SettingsScreen() {
         }
     };
 
+    const handleAccountPortalError = (err: unknown) => {
+        const message =
+            err instanceof AccountPortalConfigError
+                ? err.message
+                : 'Could not open Account Portal. Please try again.';
+        Alert.alert('Not configured', message, [{ text: 'OK' }]);
+    };
+
     const openAccountPortal = async () => {
-        if (accountPortalUrl) {
-            await WebBrowser.openBrowserAsync(accountPortalUrl);
-        } else {
-            Alert.alert(
-                'Not configured',
-                'Account Portal URL is not set. Add EXPO_PUBLIC_CLERK_ACCOUNT_PORTAL_URL to your .env.',
-                [{ text: 'OK' }],
-            );
+        try {
+            await openAccountPortalProfileAsync(clerkOrgId);
+        } catch (err: unknown) {
+            handleAccountPortalError(err);
+        }
+    };
+
+    const openBilling = async () => {
+        if (!isOrgAdmin) return;
+
+        try {
+            await openAccountPortalBillingAsync(clerkOrgId);
+        } catch (err: unknown) {
+            handleAccountPortalError(err);
         }
     };
 
@@ -127,21 +146,26 @@ export default function SettingsScreen() {
                     </Pressable>
 
                     <Pressable
-                        onPress={() => WebBrowser.openBrowserAsync(BILLING_URL)}
-                        className="p-4 rounded-xl bg-zinc-800 active:opacity-80"
+                        onPress={openBilling}
+                        disabled={!isOrgAdmin}
+                        className={`p-4 rounded-xl bg-zinc-800 ${isOrgAdmin ? 'active:opacity-80' : 'opacity-60'}`}
                     >
                         <View className="flex-row justify-between items-center">
                             <Text className="font-sans-medium text-white">
                                 Billing
                             </Text>
-                            <Ionicons
-                                name="chevron-forward"
-                                size={20}
-                                color="#a1a1aa"
-                            />
+                            {isOrgAdmin ? (
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={20}
+                                    color="#a1a1aa"
+                                />
+                            ) : null}
                         </View>
                         <Text className="text-sm text-zinc-400 mt-1">
-                            Manage subscription and trial
+                            {isOrgAdmin
+                                ? 'Manage subscription and trial'
+                                : 'Only organization admins can manage billing'}
                         </Text>
                     </Pressable>
 

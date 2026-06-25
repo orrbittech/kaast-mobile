@@ -1,14 +1,23 @@
 import { useAuth } from '@clerk/clerk-expo';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { billingApi } from '../api/services/billing.api';
+import { billingUrl, hasAnyOrgPlan } from '../billing-config';
+
+export function invalidateSubscriptionStatus(
+    queryClient: QueryClient,
+    clerkOrgId?: string,
+): void {
+    void queryClient.invalidateQueries({
+        queryKey: clerkOrgId
+            ? ['billing', 'status', clerkOrgId]
+            : ['billing', 'status'],
+    });
+}
 
 export function useSubscriptionStatus(clerkOrgId?: string) {
     const { has, isLoaded } = useAuth();
 
-    const hasPlanFromToken =
-        has?.({ plan: 'org:starter' }) ||
-        has?.({ plan: 'org:growth' }) ||
-        has?.({ plan: 'org:scale' });
+    const hasPlanFromToken = hasAnyOrgPlan(has);
 
     const query = useQuery({
         queryKey: ['billing', 'status', clerkOrgId],
@@ -22,6 +31,6 @@ export function useSubscriptionStatus(clerkOrgId?: string) {
         isActive: hasPlanFromToken || query.data?.isActive === true,
         status: query.data?.status ?? 'unknown',
         trialEndsAt: query.data?.trialEndsAt ?? null,
-        upgradeUrl: query.data?.upgradeUrl ?? 'https://kaast.app/billing',
+        upgradeUrl: query.data?.upgradeUrl ?? billingUrl,
     };
 }

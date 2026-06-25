@@ -4,7 +4,7 @@ export {
     createAbortController,
     type ApiError,
 } from './client';
-export { isApiError, getUserFriendlyMessage, getErrorCode } from './errors';
+export { isApiError, getUserFriendlyMessage, getErrorCode, isSubscriptionRequiredError } from './errors';
 export type {
     UserProfile,
     UserSummary,

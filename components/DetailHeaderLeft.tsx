@@ -6,7 +6,7 @@ import { colors } from '../lib/theme/colors';
 
 /**
  * Header left component - shows back button on detail pages, menu toggle on list pages.
- * Detail routes: devices/[id], playlists/[id], control/[deviceId]
+ * Detail routes: devices/[id], playlists/[id], control/[device-id]
  */
 export function DetailHeaderLeft() {
     const router = useRouter();

@@ -1,32 +1,14 @@
 import { View, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Play } from 'lucide-react-native';
 import { Text } from './ui/Text';
+import { MediaCover } from './MediaCover';
 import { colors } from '../lib/theme/colors';
 import type { MediaItemDisplay } from '../lib/hooks';
-import {
-    getDisplayTitle,
-    getMediaTypeForFilter,
-    formatDurationShort,
-} from '../lib/utils/media';
+import { getDisplayTitle, formatDurationShort } from '../lib/utils/media';
 
 interface MediaListItemProps {
     item: MediaItemDisplay;
     onPress?: () => void;
-}
-
-function getMediaTypeIcon(mediaUrl: string): keyof typeof Ionicons.glyphMap {
-    const type = getMediaTypeForFilter({ mediaUrl });
-    switch (type) {
-        case 'video':
-            return 'videocam-outline';
-        case 'audio':
-            return 'musical-notes-outline';
-        case 'image':
-            return 'image-outline';
-        default:
-            return 'document-outline';
-    }
 }
 
 /** Format date to readable string */
@@ -38,15 +20,14 @@ function formatDate(iso?: string): string {
 
 export function MediaListItem({ item, onPress }: MediaListItemProps) {
     const title = getDisplayTitle(item);
-    const iconName = getMediaTypeIcon(item.mediaUrl);
 
     return (
         <Pressable
             onPress={onPress}
             className="flex-row items-center gap-4 p-4 rounded-xl bg-zinc-800 active:opacity-90"
         >
-            <View className="w-12 h-12 rounded-lg bg-zinc-700 items-center justify-center">
-                <Ionicons name={iconName} size={24} color={colors.primaryHex} />
+            <View className="w-12 h-12 rounded-lg overflow-hidden shrink-0">
+                <MediaCover mediaUrl={item.mediaUrl} fallbackSize="sm" />
             </View>
             <View className="flex-1 min-w-0">
                 <Text

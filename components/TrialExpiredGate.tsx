@@ -1,8 +1,12 @@
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Alert } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { Text } from './ui/Text';
 import { useSubscriptionStatus } from '../lib/hooks/useSubscriptionStatus';
+import { useActiveOrgContext } from '../lib/hooks';
+import {
+    AccountPortalConfigError,
+    openAccountPortalBillingAsync,
+} from '../lib/openAccountPortal';
 
 interface TrialExpiredGateProps {
     clerkOrgId?: string;
@@ -19,12 +23,25 @@ export function TrialExpiredGate({
 }: TrialExpiredGateProps) {
     const router = useRouter();
     const segments = useSegments();
-    const { isLoading, isActive, upgradeUrl } =
-        useSubscriptionStatus(clerkOrgId);
+    const { org } = useActiveOrgContext();
+    const isOrgAdmin = org?.role === 'org:admin';
+    const { isLoading, isActive } = useSubscriptionStatus(clerkOrgId);
 
     const onSettings =
         segments.includes('settings' as never) ||
         segments[segments.length - 1] === 'settings';
+
+    const openBilling = async () => {
+        try {
+            await openAccountPortalBillingAsync(clerkOrgId);
+        } catch (err: unknown) {
+            const message =
+                err instanceof AccountPortalConfigError
+                    ? err.message
+                    : 'Could not open billing. Please try again.';
+            Alert.alert('Not configured', message, [{ text: 'OK' }]);
+        }
+    };
 
     if (isLoading) return null;
     if (isActive || onSettings) return <>{children}</>;
@@ -35,22 +52,27 @@ export function TrialExpiredGate({
                 Trial ended
             </Text>
             <Text className="text-zinc-400 text-center mb-6">
-                Your organization trial has ended. Subscribe at kaast.app to keep
-                managing screens and media.
+                {isOrgAdmin
+                    ? 'Your organization trial has ended. Subscribe to keep managing screens and media.'
+                    : 'Your organization trial has ended. Contact your admin to subscribe.'}
             </Text>
-            <Pressable
-                onPress={() => WebBrowser.openBrowserAsync(upgradeUrl)}
-                className="rounded-xl bg-primary px-6 py-4 mb-3 w-full max-w-sm items-center active:opacity-90"
-            >
-                <Text className="font-sans-semibold text-white">
-                    Subscribe now
-                </Text>
-            </Pressable>
+            {isOrgAdmin ? (
+                <Pressable
+                    onPress={openBilling}
+                    className="rounded-xl bg-primary px-6 py-4 mb-3 w-full max-w-sm items-center active:opacity-90"
+                >
+                    <Text className="font-sans-semibold text-white">
+                        Subscribe now
+                    </Text>
+                </Pressable>
+            ) : null}
             <Pressable
                 onPress={() => router.push('/(drawer)/settings')}
                 className="rounded-xl bg-zinc-800 px-6 py-4 w-full max-w-sm items-center active:opacity-90"
             >
-                <Text className="font-sans-medium text-white">Settings</Text>
+                <Text className="font-sans-medium text-white">
+                    {isOrgAdmin ? 'Settings' : 'Contact your admin'}
+                </Text>
             </Pressable>
         </View>
     );

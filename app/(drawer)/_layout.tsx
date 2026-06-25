@@ -7,6 +7,7 @@ import { DetailHeaderLeft } from '../../components/DetailHeaderLeft';
 import { HeaderAvatar } from '../../components/HeaderAvatar';
 import { TrialExpiredGate } from '../../components/TrialExpiredGate';
 import { useActiveOrgContext } from '../../lib/hooks';
+import { colors } from '../../lib/theme/colors';
 
 function ActiveOrgPrefetch() {
     useActiveOrgContext();
@@ -45,8 +46,9 @@ export default function DrawerLayout() {
                     headerTitleStyle: { fontFamily: 'Urbanist_600SemiBold' },
                     headerBlurEffect: 'dark',
                     drawerStyle: { backgroundColor: '#171717' },
-                    drawerActiveTintColor: '#ffffff',
+                    drawerActiveTintColor: colors.primaryHex,
                     drawerInactiveTintColor: '#e4e4e7',
+                    drawerActiveBackgroundColor: 'transparent',
                     drawerLabelStyle: { fontFamily: 'Urbanist_500Medium' },
                     overlayColor: 'rgba(0,0,0,0.5)',
                 }}
@@ -124,7 +126,7 @@ export default function DrawerLayout() {
                     }}
                 />
                 <Drawer.Screen
-                    name="control/[deviceId]"
+                    name="control/[device-id]"
                     options={{
                         drawerLabel: 'Control',
                         drawerItemStyle: { display: 'none' },

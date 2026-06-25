@@ -25,6 +25,7 @@ import {
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { PlaylistCard } from '../../../components/PlaylistCard';
+import { PlaylistListItem } from '../../../components/PlaylistListItem';
 import { MediaListItem } from '../../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
@@ -80,8 +81,13 @@ export default function PlaylistsScreen() {
         [devices],
     );
     const playlistIdsWithItems = useMemo(
-        () => new Set(mediaItems?.flatMap((m) => m.playlistIds) ?? []),
-        [mediaItems],
+        () =>
+            new Set(
+                playlists
+                    ?.filter((p) => (p.items?.length ?? 0) > 0)
+                    .map((p) => p.id) ?? [],
+            ),
+        [playlists],
     );
 
     /** Filter playlists by status (active, inactive, empty) */
@@ -276,55 +282,47 @@ export default function PlaylistsScreen() {
 
                 {!isLoading && !error && playlists && firstOrg && (
                     <View className="gap-4">
-                        {viewMode === 'card' ? (
-                            filteredPlaylists.length === 0 ? (
-                                <View className="py-12 items-center">
-                                    <Text className="text-zinc-400 text-center mb-4">
-                                        {playlists.length === 0
-                                            ? 'No playlists yet. Create one to get started.'
-                                            : `No ${playlistFilter === 'all' ? '' : playlistFilter} playlists found.`}
-                                    </Text>
-                                    {playlists.length === 0 && (
-                                        <Pressable
-                                            onPress={() =>
-                                                setCreateModalVisible(true)
-                                            }
-                                            className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
-                                        >
-                                            <Text className="font-sans-medium text-white">
-                                                Create Playlist
-                                            </Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-                            ) : (
-                                filteredPlaylists.map((playlist) => (
-                                    <PlaylistCard
-                                        key={playlist.id}
-                                        playlist={playlist}
-                                        itemCount={playlist.items?.length}
-                                        locationName={firstOrg?.name ?? 'Organization'}
-                                        onMenuPress={() =>
-                                            setMenuPlaylist({
-                                                id: playlist.id,
-                                                name: playlist.name,
-                                            })
-                                        }
-                                    />
-                                ))
-                            )
-                        ) : !mediaItems || mediaItems.length === 0 ? (
+                        {filteredPlaylists.length === 0 ? (
                             <View className="py-12 items-center">
                                 <Text className="text-zinc-400 text-center mb-4">
-                                    No media yet. Add media to playlists to see
-                                    it here.
+                                    {playlists.length === 0
+                                        ? 'No playlists yet. Create one to get started.'
+                                        : `No ${playlistFilter === 'all' ? '' : playlistFilter} playlists found.`}
                                 </Text>
+                                {playlists.length === 0 && (
+                                    <Pressable
+                                        onPress={() =>
+                                            setCreateModalVisible(true)
+                                        }
+                                        className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
+                                    >
+                                        <Text className="font-sans-medium text-white">
+                                            Create Playlist
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </View>
+                        ) : viewMode === 'card' ? (
+                            filteredPlaylists.map((playlist) => (
+                                <PlaylistCard
+                                    key={playlist.id}
+                                    playlist={playlist}
+                                    itemCount={playlist.items?.length}
+                                    locationName={firstOrg?.name ?? 'Organization'}
+                                    onMenuPress={() =>
+                                        setMenuPlaylist({
+                                            id: playlist.id,
+                                            name: playlist.name,
+                                        })
+                                    }
+                                />
+                            ))
                         ) : (
-                            mediaItems.map((item) => (
-                                <MediaListItem
-                                    key={item.id}
-                                    item={item}
+                            filteredPlaylists.map((playlist) => (
+                                <PlaylistListItem
+                                    key={playlist.id}
+                                    playlist={playlist}
+                                    locationName={firstOrg?.name ?? 'Organization'}
                                 />
                             ))
                         )}

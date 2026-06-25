@@ -16,6 +16,7 @@ export function isApiError(error: unknown): error is ApiError {
             'UNAUTHORIZED',
             'CLIENT_ERROR',
             'SERVER_ERROR',
+            'SUBSCRIPTION_REQUIRED',
         ].includes((error as ApiError).code)
     );
 }
@@ -33,6 +34,8 @@ export function getUserFriendlyMessage(error: unknown): string {
                 return 'Session expired. Please sign in again.';
             case 'CLIENT_ERROR':
                 return error.message;
+            case 'SUBSCRIPTION_REQUIRED':
+                return error.message;
             case 'SERVER_ERROR':
                 return 'Something went wrong on our end. Please try again later.';
             default:
@@ -48,6 +51,10 @@ export function getUserFriendlyMessage(error: unknown): string {
 /**
  * Extracts ApiError code for conditional UI (e.g., show "Sign in again" for UNAUTHORIZED).
  */
+export function isSubscriptionRequiredError(error: unknown): error is ApiError {
+    return isApiError(error) && error.code === 'SUBSCRIPTION_REQUIRED';
+}
+
 export function getErrorCode(error: unknown): ApiError['code'] | null {
     if (isApiError(error)) {
         return error.code;
