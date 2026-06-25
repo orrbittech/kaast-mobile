@@ -27,15 +27,17 @@ import { deviceKeys, mediaSessionKeys } from '../api/query-keys';
 import type { DeviceWithMediaSession, MediaSession } from '../api/types';
 import { showSuccessNotification } from '../notifications/successNotification';
 import { getDisplayTitle } from '../utils/media';
+import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
 
 export type { Playlist, PlaylistItem } from '../api';
 
 /** List playlists for an organization (includes items for counts and covers). */
 export function usePlaylists(clerkOrgId: string | undefined) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: playlistKeys.mediaList(clerkOrgId ?? ''),
         queryFn: ({ signal }) => playlistsApi.listWithItems(clerkOrgId!, { signal }),
-        enabled: !!clerkOrgId,
+        enabled: !!clerkOrgId && queriesEnabled,
         staleTime: 30_000,
         refetchOnWindowFocus: true,
     });
@@ -46,10 +48,11 @@ export function useAssignedPlaylist(
     deviceId: string | undefined,
     options?: { enabled?: boolean },
 ) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery<Playlist | null>({
         queryKey: playlistKeys.assigned(deviceId ?? ''),
         queryFn: ({ signal }) => playlistsApi.getAssigned(deviceId!, { signal }),
-        enabled: (options?.enabled ?? true) && !!deviceId,
+        enabled: (options?.enabled ?? true) && !!deviceId && queriesEnabled,
         staleTime: 15_000,
         refetchOnWindowFocus: true,
     });
@@ -57,10 +60,11 @@ export function useAssignedPlaylist(
 
 /** Single playlist with items. */
 export function usePlaylist(id: string | undefined) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: playlistKeys.detail(id ?? ''),
         queryFn: ({ signal }) => playlistsApi.getById(id!, { signal }),
-        enabled: !!id,
+        enabled: !!id && queriesEnabled,
         staleTime: 15_000,
         refetchOnWindowFocus: true,
     });
@@ -81,6 +85,48 @@ export function useCreatePlaylist(clerkOrgId?: string) {
                         old ? [...old, data] : [data],
                 );
                 invalidatePlaylists(queryClient, { clerkOrgId: orgId });
+            }
+            showSuccessNotification('Playlist created', data.name);
+        },
+    });
+}
+
+/** Create playlist with required initial schedule. */
+export function useCreatePlaylistWithSchedule(clerkOrgId?: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (body: {
+            name: string;
+            locationId?: string | null;
+            schedule: CreatePlaylistSchedule;
+        }) => {
+            const playlist = await playlistsApi.create({
+                name: body.name,
+                locationId: body.locationId ?? null,
+            });
+            try {
+                await playlistsApi.createSchedule(playlist.id, body.schedule);
+            } catch (error) {
+                if (clerkOrgId) {
+                    invalidatePlaylists(queryClient, { clerkOrgId });
+                }
+                throw error;
+            }
+            return playlist;
+        },
+        onSuccess: (data) => {
+            const orgId = data.clerkOrgId ?? clerkOrgId;
+            if (orgId) {
+                queryClient.setQueryData(
+                    playlistKeys.mediaList(orgId),
+                    (old: Playlist[] | undefined) =>
+                        old ? [...old, data] : [data],
+                );
+                invalidatePlaylists(queryClient, { clerkOrgId: orgId });
+                void queryClient.invalidateQueries({
+                    queryKey: playlistKeys.scheduleList(data.id),
+                });
             }
             showSuccessNotification('Playlist created', data.name);
         },
@@ -124,6 +170,70 @@ export function useUpdatePlaylist(clerkOrgId: string | undefined) {
                 invalidateAfterPlaylistContentChange(queryClient, {
                     clerkOrgId,
                     playlistId: variables.id,
+                });
+            }
+            showSuccessNotification('Playlist updated', data.name);
+        },
+    });
+}
+
+/** Update playlist and/or schedule with partial PATCH payloads. */
+export function useUpdatePlaylistWithSchedule(clerkOrgId?: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (body: {
+            playlistId: string;
+            scheduleId: string | null;
+            playlistPatch: UpdatePlaylist;
+            schedulePatch: UpdatePlaylistSchedule;
+        }) => {
+            let playlist: Playlist | null = null;
+            if (Object.keys(body.playlistPatch).length > 0) {
+                playlist = await playlistsApi.update(body.playlistId, body.playlistPatch);
+            }
+            if (Object.keys(body.schedulePatch).length > 0) {
+                if (body.scheduleId) {
+                    await playlistsApi.updateSchedule(
+                        body.playlistId,
+                        body.scheduleId,
+                        body.schedulePatch,
+                    );
+                } else {
+                    await playlistsApi.createSchedule(
+                        body.playlistId,
+                        body.schedulePatch as CreatePlaylistSchedule,
+                    );
+                }
+            }
+            if (!playlist) {
+                playlist = await playlistsApi.getById(body.playlistId);
+            }
+            return playlist;
+        },
+        onSuccess: (data, variables) => {
+            if (clerkOrgId) {
+                queryClient.setQueryData(
+                    playlistKeys.mediaList(clerkOrgId),
+                    (old: Playlist[] | undefined) =>
+                        old
+                            ? old.map((p) =>
+                                  p.id === variables.playlistId ? { ...p, ...data } : p,
+                              )
+                            : [],
+                );
+            }
+            queryClient.setQueryData(
+                playlistKeys.detail(variables.playlistId),
+                (old: Playlist | undefined) => (old ? { ...old, ...data } : undefined),
+            );
+            void queryClient.invalidateQueries({
+                queryKey: playlistKeys.scheduleList(variables.playlistId),
+            });
+            if (clerkOrgId) {
+                invalidatePlaylists(queryClient, {
+                    clerkOrgId,
+                    playlistId: variables.playlistId,
                 });
             }
             showSuccessNotification('Playlist updated', data.name);
@@ -197,10 +307,7 @@ export function useAddPlaylistItem(playlistId: string | undefined, clerkOrgId?: 
                 playlistId: playlistId ?? undefined,
             });
             invalidateDevices(queryClient);
-            const itemLabel = getDisplayTitle({
-                mediaUrl: variables.mediaUrl,
-                title: variables.title ?? undefined,
-            });
+            const itemLabel = newItem.title ?? newItem.mediaUrl;
             showSuccessNotification('Added to playlist', itemLabel);
         },
     });

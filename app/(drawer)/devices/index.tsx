@@ -22,6 +22,8 @@ import {
     useDeleteDevice,
     usePairDevice,
 } from '../../../lib/hooks';
+import { useSubscriptionGate } from '../../../lib/context/SubscriptionContext';
+import { openAccountPortalBillingAsync } from '../../../lib/openAccountPortal';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { DeviceCard } from '../../../components/DeviceCard';
@@ -36,6 +38,7 @@ export default function DevicesScreen() {
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
 
     const { clerkOrgId, locations, org: firstOrg } = useActiveOrgContext();
+    const { atDeviceLimit, limits, usage } = useSubscriptionGate();
 
     const {
         data: devices,
@@ -93,6 +96,17 @@ export default function DevicesScreen() {
             locationName.includes(q)
         );
     });
+
+    const canAddDevice = firstOrg && !atDeviceLimit;
+
+    const handleUpgradeForDevices = async () => {
+        if (!clerkOrgId) return;
+        try {
+            await openAccountPortalBillingAsync(clerkOrgId);
+        } catch {
+            // User dismissed portal
+        }
+    };
 
     const handleCreate = async () => {
         if (!createName.trim() || !createDeviceId.trim()) return;
@@ -194,20 +208,20 @@ export default function DevicesScreen() {
                             <Ionicons name="filter-outline" size={20} color="#ffffff" />
                         </Pressable>
                         <Pressable
-                            onPress={() => firstOrg && setPairModalVisible(true)}
-                            disabled={!firstOrg}
+                            onPress={() => canAddDevice && setPairModalVisible(true)}
+                            disabled={!canAddDevice}
                             className={`w-10 h-10 rounded-xl items-center justify-center ${
-                                firstOrg ? 'bg-zinc-700 active:opacity-80' : 'bg-zinc-800 opacity-50'
+                                canAddDevice ? 'bg-zinc-700 active:opacity-80' : 'bg-zinc-800 opacity-50'
                             }`}
                             accessibilityLabel="Pair device"
                         >
                             <Ionicons name="qr-code-outline" size={22} color="#ffffff" />
                         </Pressable>
                         <Pressable
-                            onPress={() => firstOrg && setCreateModalVisible(true)}
-                            disabled={!firstOrg}
+                            onPress={() => canAddDevice && setCreateModalVisible(true)}
+                            disabled={!canAddDevice}
                             className={`w-10 h-10 rounded-xl items-center justify-center ${
-                                firstOrg ? 'bg-approve active:opacity-90' : 'bg-zinc-800 opacity-50'
+                                canAddDevice ? 'bg-approve active:opacity-90' : 'bg-zinc-800 opacity-50'
                             }`}
                             accessibilityLabel="Add device"
                         >
@@ -215,6 +229,25 @@ export default function DevicesScreen() {
                         </Pressable>
                     </View>
                 </View>
+
+                {atDeviceLimit && firstOrg && (
+                    <View className="py-4 px-4 rounded-xl bg-zinc-800 mb-4 border border-primary/30">
+                        <Text className="text-zinc-200 text-center mb-3">
+                            You&apos;ve reached your plan limit of{' '}
+                            {limits.maxDevices} TV
+                            {limits.maxDevices === 1 ? '' : 's'} ({usage.devices}{' '}
+                            in use). Upgrade to add more screens.
+                        </Text>
+                        <Pressable
+                            onPress={() => void handleUpgradeForDevices()}
+                            className="py-3 px-6 rounded-xl bg-primary items-center active:opacity-90"
+                        >
+                            <Text className="font-sans-medium text-white">
+                                Upgrade plan
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
 
                 {!firstOrg && !isLoading && (
                     <View className="py-6 px-4 rounded-xl bg-zinc-800 mb-4">
@@ -257,11 +290,15 @@ export default function DevicesScreen() {
                                 </Text>
                                 {devices.length === 0 && (
                                     <Pressable
-                                        onPress={() => setPairModalVisible(true)}
+                                        onPress={() =>
+                                            canAddDevice
+                                                ? setPairModalVisible(true)
+                                                : void handleUpgradeForDevices()
+                                        }
                                         className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
                                     >
                                         <Text className="font-sans-medium text-white">
-                                            Pair Device
+                                            {canAddDevice ? 'Pair Device' : 'Upgrade to add TVs'}
                                         </Text>
                                     </Pressable>
                                 )}

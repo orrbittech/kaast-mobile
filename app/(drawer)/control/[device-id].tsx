@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, ActivityIndicator, Pressable, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -25,25 +25,28 @@ import { RemoteControlButton } from '../../../components/RemoteControlButton';
 import { MediaCover } from '../../../components/MediaCover';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
-import { getDisplayTitle, getFirstItemCoverUrl } from '../../../lib/utils/media';
+import {
+    getDisplayTitle,
+    getFirstItemCoverUrl,
+    getSessionPreviewUri,
+} from '../../../lib/utils/media';
 import { mediaControlSocket } from '../../../lib/ws/media-control-socket';
 import type { MediaSession, PlaylistItem } from '../../../lib/api/types';
 
 const VOLUME_STEP = 0.1;
 
-function getPreviewUri(
-    session:
-        | Pick<MediaSession, 'snapshotData' | 'mediaUrl'>
-        | null
-        | undefined,
-): string | null {
-    if (session?.snapshotData) {
-        return `data:image/jpeg;base64,${session.snapshotData}`;
-    }
-    if (session?.mediaUrl) {
-        return session.mediaUrl;
-    }
-    return null;
+type LiveSessionState = Omit<MediaSession, 'snapshotData'>;
+
+function toLiveSessionState(session: MediaSession): LiveSessionState {
+    return {
+        deviceId: session.deviceId,
+        mediaUrl: session.mediaUrl,
+        position: session.position,
+        duration: session.duration,
+        playing: session.playing,
+        volume: session.volume,
+        updatedAt: session.updatedAt,
+    };
 }
 
 function getItemTitle(item: PlaylistItem): string {
@@ -70,8 +73,12 @@ export default function ControlScreen() {
     const sendCommand = useSendMediaCommand(device?.deviceId);
     const loadPlaylist = useLoadPlaylistOnDevice(clerkOrgId ?? undefined);
     const embeddedSession = device?.mediaSession;
-    const { data: polledSession } = useMediaSession(device?.deviceId);
-    const [liveSession, setLiveSession] = useState<MediaSession | null>(null);
+    const [liveSession, setLiveSession] = useState<LiveSessionState | null>(null);
+    const [snapshotData, setSnapshotData] = useState<string | null>(null);
+    const lastMediaUrlRef = useRef<string | null>(null);
+    const { data: polledSession } = useMediaSession(device?.deviceId, {
+        pollWhenDisconnected: liveSession == null,
+    });
     const [optimisticVolume, setOptimisticVolume] = useState<number | null>(null);
     const [loadPlaylistModalVisible, setLoadPlaylistModalVisible] = useState(false);
     const [selectedLoadPlaylistId, setSelectedLoadPlaylistId] = useState<string | null>(null);
@@ -84,21 +91,53 @@ export default function ControlScreen() {
 
         void mediaControlSocket.connect(device.deviceId);
         const unsub = mediaControlSocket.onSessionState((next) => {
-            setLiveSession(next);
+            const mediaUrl = next.mediaUrl ?? null;
+            if (mediaUrl !== lastMediaUrlRef.current) {
+                lastMediaUrlRef.current = mediaUrl;
+                setSnapshotData(next.snapshotData ?? null);
+            }
+            setLiveSession(toLiveSessionState(next));
             setOptimisticVolume(null);
         });
 
         return () => {
             unsub();
             mediaControlSocket.disconnect();
+            setLiveSession(null);
+            setSnapshotData(null);
+            lastMediaUrlRef.current = null;
         };
     }, [device?.deviceId]);
 
     useEffect(() => {
         if (polledSession?.volume != null && optimisticVolume == null) {
-            setLiveSession((prev) => ({ ...(prev ?? polledSession), ...polledSession }));
+            setLiveSession((prev) => ({
+                ...(prev ?? toLiveSessionState(polledSession)),
+                ...toLiveSessionState(polledSession),
+            }));
+            if (polledSession.mediaUrl !== lastMediaUrlRef.current) {
+                lastMediaUrlRef.current = polledSession.mediaUrl ?? null;
+                setSnapshotData(polledSession.snapshotData ?? null);
+            }
         }
     }, [polledSession, optimisticVolume]);
+
+    useEffect(() => {
+        if (!embeddedSession || liveSession) return;
+        if (embeddedSession.snapshotData) {
+            setSnapshotData(embeddedSession.snapshotData);
+        }
+        if (embeddedSession.mediaUrl) {
+            lastMediaUrlRef.current = embeddedSession.mediaUrl;
+        }
+    }, [embeddedSession, liveSession]);
+
+    const fallbackCoverUrl = getFirstItemCoverUrl(assignedPlaylist?.items);
+    const previewMediaUrl = useMemo(
+        () =>
+            getSessionPreviewUri(session, snapshotData) ?? fallbackCoverUrl,
+        [session, snapshotData, fallbackCoverUrl],
+    );
 
     if (isLoading) {
         return (
@@ -124,9 +163,6 @@ export default function ControlScreen() {
         );
     }
 
-    const previewUri = getPreviewUri(session);
-    const fallbackCoverUrl = getFirstItemCoverUrl(assignedPlaylist?.items);
-    const previewMediaUrl = previewUri ?? fallbackCoverUrl;
     const position = session?.position ?? 0;
     const duration = session?.duration ?? 0;
 

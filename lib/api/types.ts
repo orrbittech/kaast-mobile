@@ -128,6 +128,12 @@ export interface MediaCommand {
     payload?: { playlistId?: string } & Record<string, unknown>;
 }
 
+/** Primary schedule summary on playlist list responses */
+export interface PlaylistPrimaryScheduleSummary {
+    startTime: string;
+    endTime: string;
+}
+
 /** Playlist from playlists API */
 export interface Playlist {
     id: string;
@@ -137,12 +143,14 @@ export interface Playlist {
     createdAt?: string;
     updatedAt?: string;
     items?: PlaylistItem[];
+    primarySchedule?: PlaylistPrimaryScheduleSummary | null;
 }
 
-/** Playlist item from playlists API */
+/** Playlist item from playlists API (hydrated from media library) */
 export interface PlaylistItem {
     id: string;
     playlistId: string;
+    mediaId: string;
     mediaUrl: string;
     title?: string | null;
     duration?: number | null;
@@ -153,29 +161,32 @@ export interface PlaylistItem {
 /** Create playlist request body */
 export interface CreatePlaylist {
     name: string;
+    locationId?: string | null;
 }
 
 /** Update playlist request body */
 export interface UpdatePlaylist {
     name?: string;
+    locationId?: string | null;
 }
 
 /** Create playlist item request body */
 export interface CreatePlaylistItem {
-    mediaUrl: string;
-    title?: string | null;
-    duration?: number | null;
+    mediaId: string;
     order?: number;
-    mediaId?: string | null;
 }
 
 /** Update playlist item request body */
 export interface UpdatePlaylistItem {
-    mediaUrl?: string;
-    title?: string | null;
-    duration?: number | null;
+    mediaId?: string;
     order?: number;
-    mediaId?: string | null;
+}
+
+/** Playlists referencing a media library item */
+export interface MediaLibraryUsage {
+    mediaId: string;
+    playlistCount: number;
+    playlists: { id: string; name: string }[];
 }
 
 export type PlaylistDeviceAssignmentSource = 'manual' | 'schedule' | 'both';
@@ -192,6 +203,7 @@ export interface PlaylistAssignedDevice {
 
 export type RepeatType = 'none' | 'daily' | 'weekly' | 'custom';
 export type DeviceTargetMode = 'all' | 'include' | 'exclude';
+export type SchedulePriority = 'low' | 'medium' | 'high';
 
 /** Playlist schedule slot from API */
 export interface PlaylistSchedule {
@@ -204,7 +216,7 @@ export interface PlaylistSchedule {
     repeatType: RepeatType;
     daysOfWeek: number[];
     timezone: string;
-    priority: number;
+    priority: SchedulePriority;
     enabled: boolean;
     loopPlaylist: boolean;
     deviceTargetMode: DeviceTargetMode;
@@ -221,7 +233,7 @@ export interface CreatePlaylistSchedule {
     repeatType?: RepeatType;
     daysOfWeek?: number[];
     timezone?: string;
-    priority?: number;
+    priority?: SchedulePriority;
     enabled?: boolean;
     loopPlaylist?: boolean;
     deviceTargetMode?: DeviceTargetMode;

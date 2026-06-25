@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './ui/Text';
 import { colors } from '../lib/theme/colors';
 import { isImageUrl } from '../lib/utils/media';
@@ -43,12 +43,20 @@ export function MediaCover({
     fallbackSize = 'md',
 }: MediaCoverProps) {
     const [failed, setFailed] = useState(false);
+    const lastUrlRef = useRef<string | null>(null);
 
     useEffect(() => {
-        setFailed(false);
+        if (mediaUrl !== lastUrlRef.current) {
+            lastUrlRef.current = mediaUrl ?? null;
+            setFailed(false);
+        }
     }, [mediaUrl]);
 
-    const showImage = !!mediaUrl && isImageUrl(mediaUrl) && !failed;
+    const showImage = !!mediaUrl && (isImageUrl(mediaUrl) || mediaUrl.startsWith('data:')) && !failed;
+    const recyclingKey = useMemo(
+        () => (mediaUrl?.startsWith('data:') ? mediaUrl.slice(0, 64) : mediaUrl),
+        [mediaUrl],
+    );
 
     return (
         <View className={className} style={style}>
@@ -57,6 +65,9 @@ export function MediaCover({
                     source={{ uri: mediaUrl }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit={contentFit}
+                    cachePolicy="memory-disk"
+                    recyclingKey={recyclingKey ?? undefined}
+                    transition={150}
                     onError={() => setFailed(true)}
                 />
             ) : (

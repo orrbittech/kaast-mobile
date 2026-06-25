@@ -4,10 +4,7 @@ import {
     ScrollView,
     Pressable,
     Modal,
-    TextInput,
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
     RefreshControl,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,10 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
     usePlaylist,
-    useUpdatePlaylist,
     useDeletePlaylist,
     useAddPlaylistItem,
-    useUpdatePlaylistItem,
     useRemovePlaylistItem,
     useMediaItems,
     useActiveOrgContext,
@@ -27,6 +22,7 @@ import {
     usePausePlaylistOnAllDevices,
     useResumePlaylistOnAllDevices,
 } from '../../../lib/hooks';
+import { EditPlaylistModal } from '../../../components/EditPlaylistModal';
 import { deviceKeys, mediaSessionKeys } from '../../../lib/api';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
@@ -67,28 +63,14 @@ export default function PlaylistDetailScreen() {
     const { clerkOrgId, locations } = useActiveOrgContext();
     const { data: mediaItems } = useMediaItems(clerkOrgId);
     const deviceStats = usePlaylistDeviceStats(id, clerkOrgId, playlist?.items);
-    const updatePlaylist = useUpdatePlaylist(playlist?.clerkOrgId);
     const deletePlaylist = useDeletePlaylist(playlist?.clerkOrgId);
     const addItem = useAddPlaylistItem(id, playlist?.clerkOrgId);
-    const updatePlaylistItem = useUpdatePlaylistItem(id, playlist?.clerkOrgId);
     const removeItem = useRemovePlaylistItem(id, playlist?.clerkOrgId);
     const pauseAll = usePausePlaylistOnAllDevices(id);
     const resumeAll = useResumePlaylistOnAllDevices(id);
 
     const [editModalVisible, setEditModalVisible] = useState(false);
-    const [editItemModalVisible, setEditItemModalVisible] = useState(false);
-    const [editItem, setEditItem] = useState<{
-        id: string;
-        mediaUrl: string;
-        title?: string | null;
-    } | null>(null);
-    const [editItemTitle, setEditItemTitle] = useState('');
-    const [editItemUrl, setEditItemUrl] = useState('');
     const [addModalVisible, setAddModalVisible] = useState(false);
-    const [addMode, setAddMode] = useState<'library' | 'url'>('library');
-    const [editName, setEditName] = useState('');
-    const [addMediaUrl, setAddMediaUrl] = useState('');
-    const [addTitle, setAddTitle] = useState('');
     const [menuItem, setMenuItem] = useState<{
         id: string;
         mediaUrl: string;
@@ -100,19 +82,6 @@ export default function PlaylistDetailScreen() {
         mediaUrl: string;
         title?: string | null;
     } | null>(null);
-
-    const handleEdit = async () => {
-        if (!playlist || !editName.trim()) return;
-        try {
-            await updatePlaylist.mutateAsync({
-                id: playlist.id,
-                body: { name: editName.trim() },
-            });
-            setEditModalVisible(false);
-        } catch {
-            // Global NetworkErrorHandler shows error
-        }
-    };
 
     const handleDelete = () => {
         if (!playlist) return;
@@ -133,73 +102,22 @@ export default function PlaylistDetailScreen() {
         }
     };
 
-    const handleAddItem = async () => {
-        if (!addMediaUrl.trim()) return;
+    const handleAddFromLibrary = async (media: { id: string; title?: string }) => {
         try {
             await addItem.mutateAsync({
-                mediaUrl: addMediaUrl.trim(),
-                title: addTitle.trim() || undefined,
+                mediaId: media.id,
             });
             setAddModalVisible(false);
-            setAddMediaUrl('');
-            setAddTitle('');
-            setAddMode('library');
         } catch {
             // Global NetworkErrorHandler shows error
         }
     };
 
-    const handleAddFromLibrary = async (media: {
-        mediaUrl: string;
-        title?: string;
-    }) => {
-        try {
-            await addItem.mutateAsync({
-                mediaUrl: media.mediaUrl,
-                title: media.title,
-            });
-            setAddModalVisible(false);
-            setAddMode('library');
-        } catch {
-            // Global NetworkErrorHandler shows error
-        }
-    };
-
-    const playlistMediaUrls = new Set(
-        playlist?.items?.map((item) => item.mediaUrl) ?? [],
+    const playlistMediaIds = new Set(
+        playlist?.items?.map((item) => item.mediaId) ?? [],
     );
     const libraryItems =
-        mediaItems?.filter((item) => !playlistMediaUrls.has(item.mediaUrl)) ??
-        [];
-
-    const openEditItemModal = (item: {
-        id: string;
-        mediaUrl: string;
-        title?: string | null;
-    }) => {
-        setMenuItem(null);
-        setEditItem(item);
-        setEditItemTitle(item.title ?? '');
-        setEditItemUrl(item.mediaUrl);
-        setEditItemModalVisible(true);
-    };
-
-    const handleEditItem = async () => {
-        if (!editItem || !editItemUrl.trim()) return;
-        try {
-            await updatePlaylistItem.mutateAsync({
-                itemId: editItem.id,
-                body: {
-                    mediaUrl: editItemUrl.trim(),
-                    title: editItemTitle.trim() || null,
-                },
-            });
-            setEditItemModalVisible(false);
-            setEditItem(null);
-        } catch {
-            // Global NetworkErrorHandler shows error
-        }
-    };
+        mediaItems?.filter((item) => !playlistMediaIds.has(item.id)) ?? [];
 
     const handleRemoveItem = (item: { id: string; mediaUrl: string; title?: string | null }) => {
         setMenuItem(null);
@@ -218,7 +136,6 @@ export default function PlaylistDetailScreen() {
 
     const openEditModal = () => {
         if (playlist) {
-            setEditName(playlist.name);
             setEditModalVisible(true);
         }
     };
@@ -433,64 +350,11 @@ export default function PlaylistDetailScreen() {
                 )}
             </ScrollView>
 
-            {/* Edit Modal */}
-            <Modal
+            <EditPlaylistModal
                 visible={editModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setEditModalVisible(false)}
-            >
-                <Pressable
-                    className="flex-1 bg-black/60 justify-center items-center px-6"
-                    onPress={() => setEditModalVisible(false)}
-                >
-                    <Pressable
-                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
-                        onPress={(e) => e.stopPropagation()}
-                    >
-                        <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Edit Playlist
-                        </Text>
-                        <Text className="text-zinc-400 text-sm mb-2">Name</Text>
-                        <TextInput
-                            value={editName}
-                            onChangeText={setEditName}
-                            placeholder="Playlist name"
-                            placeholderTextColor="#71717a"
-                            style={{ fontFamily: 'Urbanist_400Regular' }}
-                            className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                        />
-                        <View className="flex-row gap-3">
-                            <Pressable
-                                onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-primary items-center"
-                            >
-                                <Text className="font-sans-medium text-white">
-                                    Cancel
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handleEdit}
-                                disabled={
-                                    !editName.trim() || updatePlaylist.isPending
-                                }
-                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                            >
-                                {updatePlaylist.isPending ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="#ffffff"
-                                    />
-                                ) : (
-                                    <Text className="font-sans-medium text-white">
-                                        Save
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
+                playlistId={id ?? null}
+                onClose={() => setEditModalVisible(false)}
+            />
 
             {/* Add Item Modal */}
             <Modal
@@ -508,126 +372,36 @@ export default function PlaylistDetailScreen() {
                         onPress={(e) => e.stopPropagation()}
                     >
                         <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Add Media Item
+                            Add from library
                         </Text>
-                        <View className="flex-row gap-2 mb-4">
-                            <Pressable
-                                onPress={() => setAddMode('library')}
-                                className={`flex-1 py-2.5 rounded-xl items-center ${
-                                    addMode === 'library' ? 'bg-approve' : 'bg-zinc-700'
-                                }`}
-                            >
-                                <Text className="font-sans-medium text-white text-sm">
-                                    From library
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setAddMode('url')}
-                                className={`flex-1 py-2.5 rounded-xl items-center ${
-                                    addMode === 'url' ? 'bg-approve' : 'bg-zinc-700'
-                                }`}
-                            >
-                                <Text className="font-sans-medium text-white text-sm">
-                                    From URL
-                                </Text>
-                            </Pressable>
-                        </View>
-                        {addMode === 'library' ? (
-                            <ScrollView className="max-h-80 mb-4">
-                                {libraryItems.length === 0 ? (
-                                    <View className="py-8 items-center">
-                                        <Text className="text-zinc-400 text-center">
-                                            No other media in your library yet. Add media from
-                                            the Media tab or switch to From URL.
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <View className="gap-2">
-                                        {libraryItems.map((item) => (
-                                            <MediaListItem
-                                                key={item.id}
-                                                item={item}
-                                                onPress={() =>
-                                                    handleAddFromLibrary({
-                                                        mediaUrl: item.mediaUrl,
-                                                        title: item.title,
-                                                    })
-                                                }
-                                            />
-                                        ))}
-                                    </View>
-                                )}
-                            </ScrollView>
-                        ) : (
-                            <>
-                                <KeyboardAvoidingView
-                                    behavior={
-                                        Platform.OS === 'ios' ? 'padding' : undefined
-                                    }
-                                >
-                                    <Text className="text-zinc-400 text-sm mb-2">
-                                        Media URL
+                        <ScrollView className="max-h-80 mb-4">
+                            {libraryItems.length === 0 ? (
+                                <View className="py-8 items-center">
+                                    <Text className="text-zinc-400 text-center">
+                                        No other media in your library yet. Add media from
+                                        the Media tab first.
                                     </Text>
-                                    <TextInput
-                                        value={addMediaUrl}
-                                        onChangeText={setAddMediaUrl}
-                                        placeholder="https://..."
-                                        placeholderTextColor="#71717a"
-                                        style={{ fontFamily: 'Urbanist_400Regular' }}
-                                        className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
-                                    />
-                                    <Text className="text-zinc-400 text-sm mb-2">
-                                        Title (optional)
-                                    </Text>
-                                    <TextInput
-                                        value={addTitle}
-                                        onChangeText={setAddTitle}
-                                        placeholder="Display name"
-                                        placeholderTextColor="#71717a"
-                                        style={{ fontFamily: 'Urbanist_400Regular' }}
-                                        className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                                    />
-                                </KeyboardAvoidingView>
-                                <View className="flex-row gap-3">
-                                    <Pressable
-                                        onPress={() => setAddModalVisible(false)}
-                                        className="flex-1 py-3 rounded-xl bg-primary items-center"
-                                    >
-                                        <Text className="font-sans-medium text-white">
-                                            Cancel
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={handleAddItem}
-                                        disabled={
-                                            !addMediaUrl.trim() || addItem.isPending
-                                        }
-                                        className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                                    >
-                                        {addItem.isPending ? (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#ffffff"
-                                            />
-                                        ) : (
-                                            <Text className="font-sans-medium text-white">
-                                                Add
-                                            </Text>
-                                        )}
-                                    </Pressable>
                                 </View>
-                            </>
-                        )}
-                        {addMode === 'library' && (
-                            <Pressable
-                                onPress={() => setAddModalVisible(false)}
-                                className="py-3 rounded-xl bg-zinc-700 items-center"
-                            >
-                                <Text className="font-sans-medium text-white">
-                                    Cancel
-                                </Text>
-                            </Pressable>
-                        )}
+                            ) : (
+                                <View className="gap-2">
+                                    {libraryItems.map((item) => (
+                                        <MediaListItem
+                                            key={item.id}
+                                            item={item}
+                                            onPress={() => handleAddFromLibrary(item)}
+                                        />
+                                    ))}
+                                </View>
+                            )}
+                        </ScrollView>
+                        <Pressable
+                            onPress={() => setAddModalVisible(false)}
+                            className="py-3 rounded-xl bg-zinc-700 items-center"
+                        >
+                            <Text className="font-sans-medium text-white">
+                                Cancel
+                            </Text>
+                        </Pressable>
                     </Pressable>
                 </Pressable>
             </Modal>
@@ -652,19 +426,6 @@ export default function PlaylistDetailScreen() {
                                 {getItemTitle(menuItem)}
                             </Text>
                             <Pressable
-                                onPress={() => openEditItemModal(menuItem)}
-                                className="flex-row items-center gap-3 py-4 border-b border-zinc-700"
-                            >
-                                <Ionicons
-                                    name="pencil-outline"
-                                    size={22}
-                                    color="#ffffff"
-                                />
-                                <Text className="font-sans-medium text-white">
-                                    Edit
-                                </Text>
-                            </Pressable>
-                            <Pressable
                                 onPress={() => handleRemoveItem(menuItem)}
                                 className="flex-row items-center gap-3 py-4"
                             >
@@ -681,85 +442,6 @@ export default function PlaylistDetailScreen() {
                     </Pressable>
                 </Modal>
             )}
-
-            {/* Edit Item Modal */}
-            <Modal
-                visible={editItemModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setEditItemModalVisible(false)}
-            >
-                <Pressable
-                    className="flex-1 bg-black/60 justify-center items-center px-6"
-                    onPress={() => setEditItemModalVisible(false)}
-                >
-                    <Pressable
-                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
-                        onPress={(e) => e.stopPropagation()}
-                    >
-                        <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Edit Media Item
-                        </Text>
-                        <KeyboardAvoidingView
-                            behavior={
-                                Platform.OS === 'ios' ? 'padding' : undefined
-                            }
-                        >
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Title (optional)
-                            </Text>
-                            <TextInput
-                                value={editItemTitle}
-                                onChangeText={setEditItemTitle}
-                                placeholder="Display name"
-                                placeholderTextColor="#71717a"
-                                style={{ fontFamily: 'Urbanist_400Regular' }}
-                                className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-4"
-                            />
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Media URL
-                            </Text>
-                            <TextInput
-                                value={editItemUrl}
-                                onChangeText={setEditItemUrl}
-                                placeholder="https://..."
-                                placeholderTextColor="#71717a"
-                                style={{ fontFamily: 'Urbanist_400Regular' }}
-                                className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                            />
-                        </KeyboardAvoidingView>
-                        <View className="flex-row gap-3">
-                            <Pressable
-                                onPress={() => setEditItemModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-zinc-700 items-center"
-                            >
-                                <Text className="font-sans-medium text-white">
-                                    Cancel
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handleEditItem}
-                                disabled={
-                                    !editItemUrl.trim() ||
-                                    updatePlaylistItem.isPending
-                                }
-                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                            >
-                                {updatePlaylistItem.isPending ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="#ffffff"
-                                    />
-                                ) : (
-                                    <Text className="font-sans-medium text-white">
-                                        Save
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
 
             <ConfirmModal
                 visible={confirmDeletePlaylist}

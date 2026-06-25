@@ -3,8 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { Text } from '../components/ui/Text';
-import { queryClient } from '../lib/api/query-client';
-import { invalidateSubscriptionStatus } from '../lib/hooks/useSubscriptionStatus';
+import { refreshBillingStatus } from '../lib/hooks/useSubscriptionStatus';
 import { useActiveOrgContext } from '../lib/hooks';
 
 /**
@@ -17,13 +16,12 @@ export default function BillingCallbackScreen() {
     const { clerkOrgId } = useActiveOrgContext();
 
     useEffect(() => {
-        if (!isLoaded) return;
+        if (!isLoaded || !clerkOrgId) return;
 
         let cancelled = false;
 
         async function handleReturn() {
-            invalidateSubscriptionStatus(queryClient, clerkOrgId);
-            await getToken({ skipCache: true });
+            await refreshBillingStatus(clerkOrgId!, getToken, { fresh: true });
 
             if (cancelled) return;
 

@@ -16,6 +16,14 @@ export const usersApi = {
         return data;
     },
 
+    /** POST /users/me/export/email - Email data export to the signed-in user */
+    emailExportMe: async (): Promise<{ emailed: boolean; email: string }> => {
+        const { data } = await apiClient.post<{ emailed: boolean; email: string }>(
+            '/users/me/export/email',
+        );
+        return data;
+    },
+
     /** DELETE /users/me - Delete account */
     deleteMe: async (): Promise<{ deleted: boolean }> => {
         const { data } = await apiClient.delete<{ deleted: boolean }>(

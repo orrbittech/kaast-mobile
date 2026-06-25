@@ -15,6 +15,8 @@ export {
     usePlaylists,
     usePlaylist,
     useCreatePlaylist,
+    useCreatePlaylistWithSchedule,
+    useUpdatePlaylistWithSchedule,
     useUpdatePlaylist,
     useDeletePlaylist,
     useAddPlaylistItem,

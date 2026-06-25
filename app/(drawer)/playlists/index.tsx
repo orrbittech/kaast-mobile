@@ -18,18 +18,19 @@ import {
     useDevices,
     usePlaylists,
     useMediaItems,
-    useCreatePlaylist,
-    useUpdatePlaylist,
     useDeletePlaylist,
 } from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
 import { ConfirmModal } from '../../../components/ConfirmModal';
+import { CreatePlaylistModal } from '../../../components/CreatePlaylistModal';
+import { EditPlaylistModal } from '../../../components/EditPlaylistModal';
 import { PlaylistCard } from '../../../components/PlaylistCard';
 import { PlaylistListItem } from '../../../components/PlaylistListItem';
 import { MediaListItem } from '../../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
 import { getUserFriendlyMessage } from '../../../lib/api';
+import { usePlaylistCreateStore } from '../../../lib/stores/playlistCreateStore';
 
 /**
  * Playlists page - manage playlists. Duplicates devices layout.
@@ -49,12 +50,11 @@ export default function PlaylistsScreen() {
         isRefetching,
     } = usePlaylists(clerkOrgId);
     const { data: mediaItems } = useMediaItems(clerkOrgId);
-    const createPlaylist = useCreatePlaylist(clerkOrgId);
-    const updatePlaylist = useUpdatePlaylist(clerkOrgId);
     const deletePlaylist = useDeletePlaylist(clerkOrgId);
 
     const [createModalVisible, setCreateModalVisible] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
     const [menuPlaylist, setMenuPlaylist] = useState<{
         id: string;
         name: string;
@@ -64,8 +64,6 @@ export default function PlaylistsScreen() {
         name: string;
     } | null>(null);
 
-    const [createName, setCreateName] = useState('');
-    const [editName, setEditName] = useState('');
     const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
     const [searchModalVisible, setSearchModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -115,31 +113,16 @@ export default function PlaylistsScreen() {
           })
         : [];
 
-    const handleCreate = async () => {
-        if (!createName.trim()) return;
-        try {
-            await createPlaylist.mutateAsync({
-                name: createName.trim(),
-            });
-            setCreateModalVisible(false);
-            setCreateName('');
-        } catch {
-            // Global NetworkErrorHandler shows error
-        }
+    const openCreateModal = () => {
+        usePlaylistCreateStore.getState().reset();
+        setCreateModalVisible(true);
     };
 
-    const handleEdit = async () => {
-        if (!editPlaylist || !editName.trim()) return;
-        try {
-            await updatePlaylist.mutateAsync({
-                id: editPlaylist.id,
-                body: { name: editName.trim() },
-            });
-            setEditModalVisible(false);
-            setEditPlaylist(null);
-        } catch {
-            // Global NetworkErrorHandler shows error
-        }
+    const openEditModal = (playlist: { id: string; name: string }) => {
+        setMenuPlaylist(null);
+        setEditPlaylist(playlist);
+        setEditingPlaylistId(playlist.id);
+        setEditModalVisible(true);
     };
 
     const handleDelete = (playlist?: { id: string; name: string } | null) => {
@@ -161,13 +144,6 @@ export default function PlaylistsScreen() {
         } catch {
             // Global NetworkErrorHandler shows error
         }
-    };
-
-    const openEditModal = (playlist: { id: string; name: string }) => {
-        setMenuPlaylist(null);
-        setEditPlaylist(playlist);
-        setEditName(playlist.name);
-        setEditModalVisible(true);
     };
 
     return (
@@ -234,9 +210,7 @@ export default function PlaylistsScreen() {
                             />
                         </Pressable>
                         <Pressable
-                            onPress={() =>
-                                firstOrg && setCreateModalVisible(true)
-                            }
+                            onPress={() => firstOrg && openCreateModal()}
                             disabled={!firstOrg}
                             className={`w-10 h-10 rounded-xl items-center justify-center ${
                                 firstOrg
@@ -291,9 +265,7 @@ export default function PlaylistsScreen() {
                                 </Text>
                                 {playlists.length === 0 && (
                                     <Pressable
-                                        onPress={() =>
-                                            setCreateModalVisible(true)
-                                        }
+                                        onPress={openCreateModal}
                                         className="py-3 px-6 rounded-xl bg-approve active:opacity-90"
                                     >
                                         <Text className="font-sans-medium text-white">
@@ -308,7 +280,7 @@ export default function PlaylistsScreen() {
                                     key={playlist.id}
                                     playlist={playlist}
                                     itemCount={playlist.items?.length}
-                                    locationName={firstOrg?.name ?? 'Organization'}
+                                    scheduleEndTime={playlist.primarySchedule?.endTime}
                                     onMenuPress={() =>
                                         setMenuPlaylist({
                                             id: playlist.id,
@@ -330,73 +302,10 @@ export default function PlaylistsScreen() {
                 )}
             </ScrollView>
 
-            {/* Create Modal */}
-            <Modal
+            <CreatePlaylistModal
                 visible={createModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setCreateModalVisible(false)}
-            >
-                <Pressable
-                    className="flex-1 bg-black/60 justify-center items-center px-6"
-                    onPress={() => setCreateModalVisible(false)}
-                >
-                    <Pressable
-                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
-                        onPress={(e) => e.stopPropagation()}
-                    >
-                        <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Create Playlist
-                        </Text>
-                        <KeyboardAvoidingView
-                            behavior={
-                                Platform.OS === 'ios' ? 'padding' : undefined
-                            }
-                        >
-                            <Text className="text-zinc-400 text-sm mb-2">
-                                Name
-                            </Text>
-                            <TextInput
-                                value={createName}
-                                onChangeText={setCreateName}
-                                placeholder="e.g. Lobby Display"
-                                placeholderTextColor="#71717a"
-                                style={{ fontFamily: 'Urbanist_400Regular' }}
-                                className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                            />
-                        </KeyboardAvoidingView>
-                        <View className="flex-row gap-3">
-                            <Pressable
-                                onPress={() => setCreateModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-primary items-center"
-                            >
-                                <Text className="font-sans-medium text-white">
-                                    Cancel
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handleCreate}
-                                disabled={
-                                    !createName.trim() ||
-                                    createPlaylist.isPending
-                                }
-                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                            >
-                                {createPlaylist.isPending ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="#ffffff"
-                                    />
-                                ) : (
-                                    <Text className="font-sans-medium text-white">
-                                        Create
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
+                onClose={() => setCreateModalVisible(false)}
+            />
 
             {/* Filter Modal */}
             <Modal
@@ -504,66 +413,15 @@ export default function PlaylistsScreen() {
                 </Pressable>
             </Modal>
 
-            {/* Edit Modal */}
-            <Modal
+            <EditPlaylistModal
                 visible={editModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setEditModalVisible(false)}
-            >
-                <Pressable
-                    className="flex-1 bg-black/60 justify-center items-center px-6"
-                    onPress={() => setEditModalVisible(false)}
-                >
-                    <Pressable
-                        className="w-full max-w-md rounded-2xl bg-zinc-800 p-6"
-                        onPress={(e) => e.stopPropagation()}
-                    >
-                        <Text className="text-lg font-sans-semibold text-white mb-4">
-                            Edit Playlist
-                        </Text>
-                        <Text className="text-zinc-400 text-sm mb-2">
-                            Name
-                        </Text>
-                        <TextInput
-                            value={editName}
-                            onChangeText={setEditName}
-                            placeholder="Playlist name"
-                            placeholderTextColor="#71717a"
-                            style={{ fontFamily: 'Urbanist_400Regular' }}
-                            className="bg-zinc-700 rounded-xl px-4 py-3 text-white mb-6"
-                        />
-                        <View className="flex-row gap-3">
-                            <Pressable
-                                onPress={() => setEditModalVisible(false)}
-                                className="flex-1 py-3 rounded-xl bg-primary items-center"
-                            >
-                                <Text className="font-sans-medium text-white">
-                                    Cancel
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handleEdit}
-                                disabled={
-                                    !editName.trim() || updatePlaylist.isPending
-                                }
-                                className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
-                            >
-                                {updatePlaylist.isPending ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="#ffffff"
-                                    />
-                                ) : (
-                                    <Text className="font-sans-medium text-white">
-                                        Save
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
+                playlistId={editingPlaylistId}
+                onClose={() => {
+                    setEditModalVisible(false);
+                    setEditingPlaylistId(null);
+                    setEditPlaylist(null);
+                }}
+            />
 
             {/* Playlist menu (bottom sheet) */}
             {menuPlaylist && !editModalVisible && (

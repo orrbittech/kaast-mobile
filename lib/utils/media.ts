@@ -47,6 +47,27 @@ export function getFirstItemCoverUrl(items?: PlaylistItem[]): string | null {
     return first.mediaUrl;
 }
 
+/** Remote preview URI — prefers direct image URLs over heavy base64 snapshots. */
+export function getSessionPreviewUri(
+    session:
+        | { snapshotData?: string | null; mediaUrl?: string | null }
+        | null
+        | undefined,
+    snapshotOverride?: string | null,
+): string | null {
+    const mediaUrl = session?.mediaUrl ?? null;
+    if (mediaUrl && isImageUrl(mediaUrl)) {
+        return mediaUrl;
+    }
+    const snapshot = snapshotOverride ?? session?.snapshotData ?? null;
+    if (snapshot) {
+        return snapshot.startsWith('data:')
+            ? snapshot
+            : `data:image/jpeg;base64,${snapshot}`;
+    }
+    return mediaUrl;
+}
+
 export function getMediaTypeForFilter(item: { mediaUrl: string }): MediaFilterType {
     const url = item.mediaUrl.toLowerCase();
     if (isImageUrl(item.mediaUrl)) return 'image';

@@ -10,6 +10,7 @@ import { mediaApi } from '../api/services/media.api';
 import { invalidateMediaLibrary } from '../api/invalidate';
 import { showSuccessNotification } from '../notifications/successNotification';
 import { getDisplayTitle } from '../utils/media';
+import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
 
 /** Playlist item reference for legacy batch playlist operations */
 export interface MediaItemRef {
@@ -46,10 +47,11 @@ function toMediaItemDisplay(item: MediaLibraryItem): MediaItemDisplay {
  * Fetches org media library items from the media table.
  */
 export function useMediaItems(clerkOrgId: string | undefined) {
+    const queriesEnabled = useSubscriptionQueriesEnabled();
     const query = useQuery({
         queryKey: mediaLibraryKeys.list(clerkOrgId ?? ''),
         queryFn: ({ signal }) => mediaApi.listLibrary(clerkOrgId!, { signal }),
-        enabled: !!clerkOrgId,
+        enabled: !!clerkOrgId && queriesEnabled,
         staleTime: 30_000,
         refetchOnWindowFocus: true,
     });

@@ -1,6 +1,9 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { getClerkInstance } from '@clerk/clerk-expo';
 import { queryClient } from './api/query-client';
+import { billingApi } from './api/services/billing.api';
+import { hasActiveOrgPlanInJwt } from './billing-config';
 import { invalidateSubscriptionStatus } from './hooks/useSubscriptionStatus';
 
 const accountPortalProfileUrl =
@@ -51,7 +54,59 @@ function requireBaseUrl(
 async function refreshSubscriptionAfterPortal(
     clerkOrgId?: string,
 ): Promise<void> {
+    const clerk = getClerkInstance();
+    await clerk.session?.getToken({
+        skipCache: true,
+        organizationId: clerkOrgId,
+    });
     invalidateSubscriptionStatus(queryClient, clerkOrgId);
+    if (clerkOrgId) {
+        await queryClient.fetchQuery({
+            queryKey: ['billing', 'status', clerkOrgId],
+            queryFn: () => billingApi.getStatus(clerkOrgId, { fresh: true }),
+        });
+    }
+}
+
+/**
+ * Refresh the session token and check JWT body + Clerk-backed billing status.
+ * Returns true when the org already has an active plan (skip Account Portal).
+ */
+export async function refreshAndCheckSubscriptionActive(
+    clerkOrgId?: string,
+): Promise<boolean> {
+    const clerk = getClerkInstance();
+    const token = await clerk.session?.getToken({
+        skipCache: true,
+        organizationId: clerkOrgId,
+    });
+
+    if (hasActiveOrgPlanInJwt(token)) {
+        return true;
+    }
+
+    try {
+        const status = await billingApi.getStatus(clerkOrgId ?? '', {
+            fresh: true,
+        });
+        return status.isActive;
+    } catch {
+        return false;
+    }
+}
+
+/** Opens Account Portal billing only when the org has no active plan in Clerk. */
+export async function openAccountPortalBillingIfNeeded(
+    clerkOrgId?: string,
+): Promise<boolean> {
+    const alreadyActive = await refreshAndCheckSubscriptionActive(clerkOrgId);
+    if (alreadyActive) {
+        invalidateSubscriptionStatus(queryClient, clerkOrgId);
+        return false;
+    }
+
+    await openAccountPortalBillingAsync(clerkOrgId);
+    return true;
 }
 
 /** Opens an Account Portal page in the in-app browser with a domain-safe return URL. */

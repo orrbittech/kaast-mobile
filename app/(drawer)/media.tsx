@@ -26,6 +26,8 @@ import {
     useDeleteMediaItem,
     useAddPlaylistItem,
 } from '../../lib/hooks';
+import { useSubscriptionGate } from '../../lib/context/SubscriptionContext';
+import { openAccountPortalBillingAsync } from '../../lib/openAccountPortal';
 import type { MediaItemDisplay } from '../../lib/hooks';
 import { Text } from '../../components/ui/Text';
 import { ConfirmModal } from '../../components/ConfirmModal';
@@ -33,7 +35,7 @@ import { MediaCard } from '../../components/MediaCard';
 import { MediaListItem } from '../../components/MediaListItem';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 import { colors } from '../../lib/theme/colors';
-import { getUserFriendlyMessage } from '../../lib/api';
+import { getUserFriendlyMessage, mediaApi } from '../../lib/api';
 import { getDisplayTitle, getMediaTypeForFilter } from '../../lib/utils/media';
 import { uploadMediaFile } from '../../lib/media/uploadMediaFile';
 import {
@@ -51,6 +53,8 @@ export default function MediaScreen() {
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 12;
 
     const { clerkOrgId, org: firstOrg } = useActiveOrgContext();
+    const { features } = useSubscriptionGate();
+    const uploadsEnabled = features.uploads;
     const { data: playlists } = usePlaylists(clerkOrgId);
 
     const {
@@ -95,6 +99,7 @@ export default function MediaScreen() {
         createMediaItem.isPending || addPlaylistItem.isPending || uploading;
 
     const pickFromGallery = async () => {
+        if (!uploadsEnabled) return;
         setPicking(true);
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -117,6 +122,7 @@ export default function MediaScreen() {
     };
 
     const pickAudio = async () => {
+        if (!uploadsEnabled) return;
         setPicking(true);
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -195,6 +201,16 @@ export default function MediaScreen() {
     const onConfirmRemoveMedia = async () => {
         if (!confirmRemoveItem) return;
         try {
+            const usage = await mediaApi.getLibraryItemUsage(confirmRemoveItem.id);
+            if (usage.playlistCount > 0) {
+                const names = usage.playlists.map((p) => p.name).join(', ');
+                Alert.alert(
+                    'Cannot delete media',
+                    `This item is used in ${usage.playlistCount} playlist(s): ${names}. Remove it from playlists first.`,
+                );
+                setConfirmRemoveItem(null);
+                return;
+            }
             await deleteMediaItem.mutateAsync(confirmRemoveItem.id);
             setConfirmRemoveItem(null);
         } catch {
@@ -207,6 +223,9 @@ export default function MediaScreen() {
         try {
             let url = addMediaUrl.trim();
             let mimeType: string | null = null;
+            let storageKey: string | undefined;
+            let fileSizeBytes: number | undefined;
+            let mediaType: 'image' | 'video' | 'audio' | undefined;
 
             if (pickedFile) {
                 setUploading(true);
@@ -217,26 +236,29 @@ export default function MediaScreen() {
                 });
                 url = uploaded.publicUrl;
                 mimeType = pickedFile.mimeType;
+                storageKey = uploaded.objectKey;
+                fileSizeBytes = pickedFile.sizeBytes;
+                mediaType = uploaded.mediaType;
                 setUploading(false);
-
-                await createMediaItem.mutateAsync({
-                    url,
-                    title,
-                    mimeType,
-                    storageKey: uploaded.objectKey,
-                    fileSizeBytes: pickedFile.sizeBytes,
-                    mediaType: uploaded.mediaType,
-                });
-            } else {
-                if (!url) return;
-                await createMediaItem.mutateAsync({ url, title, mimeType });
+            } else if (!url) {
+                return;
             }
+
+            const created = await createMediaItem.mutateAsync({
+                url,
+                title,
+                mimeType,
+                storageKey: storageKey ?? null,
+                fileSizeBytes: fileSizeBytes ?? null,
+                mediaType: mediaType ?? null,
+            });
+
             if (selectedPlaylistId) {
                 await addPlaylistItem.mutateAsync({
-                    mediaUrl: url,
-                    title,
+                    mediaId: created.id,
                 });
             }
+
             setAddModalVisible(false);
             resetAddForm();
         } catch {
@@ -519,11 +541,34 @@ export default function MediaScreen() {
                         <Text className="text-lg font-sans-semibold text-white mb-4">
                             Add Media
                         </Text>
-                        <PickMediaButtons
-                            onPickGallery={pickFromGallery}
-                            onPickAudio={pickAudio}
-                            picking={picking}
-                        />
+                        {uploadsEnabled ? (
+                            <PickMediaButtons
+                                onPickGallery={pickFromGallery}
+                                onPickAudio={pickAudio}
+                                picking={picking}
+                            />
+                        ) : (
+                            <View className="mb-4 py-3 px-4 rounded-xl bg-zinc-900 border border-zinc-700">
+                                <Text className="text-zinc-400 text-sm text-center mb-3">
+                                    File uploads require Growth or Scale. Paste a
+                                    media URL below, or upgrade your plan.
+                                </Text>
+                                <Pressable
+                                    onPress={() =>
+                                        clerkOrgId
+                                            ? void openAccountPortalBillingAsync(
+                                                  clerkOrgId,
+                                              )
+                                            : undefined
+                                    }
+                                    className="py-2 px-4 rounded-lg bg-primary items-center active:opacity-90"
+                                >
+                                    <Text className="font-sans-medium text-white text-sm">
+                                        Upgrade plan
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        )}
                         {pickedFile ? (
                             <>
                                 <MediaUploadPreview
