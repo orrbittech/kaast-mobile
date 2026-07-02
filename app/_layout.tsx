@@ -1,6 +1,6 @@
 /** KAAST — Proprietary software of Orrbit Systems (https://www.orrbit.co.za/) */
 import { useEffect } from 'react';
-import { Appearance, AppState, Platform } from 'react-native';
+import { Appearance, AppState, InteractionManager, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
@@ -20,7 +20,10 @@ import {
 import { IndieFlower_400Regular } from '@expo-google-fonts/indie-flower';
 import '../lib/theme/global.css';
 import { NetworkErrorHandler } from '../components/NetworkErrorHandler';
+import { prefetchOnboarding } from '../lib/bootstrap';
 import { requestNotificationPermissions } from '../lib/notifications/successNotification';
+
+prefetchOnboarding();
 
 /** Suppress Clerk development keys warning in dev console */
 if (__DEV__) {
@@ -74,7 +77,10 @@ export default function RootLayout() {
     }, [fontsLoaded]);
 
     useEffect(() => {
-        requestNotificationPermissions();
+        const task = InteractionManager.runAfterInteractions(() => {
+            void requestNotificationPermissions();
+        });
+        return () => task.cancel();
     }, []);
 
     if (!fontsLoaded) {

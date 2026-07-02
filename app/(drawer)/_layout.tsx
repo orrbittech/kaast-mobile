@@ -9,7 +9,7 @@ import { HeaderAvatar } from '../../components/HeaderAvatar';
 import { TrialExpiredGate } from '../../components/TrialExpiredGate';
 import { SubscriptionProvider } from '../../lib/context/SubscriptionContext';
 import { useActiveOrgContext } from '../../lib/hooks';
-import { refreshBillingStatus } from '../../lib/hooks/useSubscriptionStatus';
+import { prefetchBillingStatus } from '../../lib/bootstrap';
 import { colors } from '../../lib/theme/colors';
 
 /**
@@ -17,7 +17,7 @@ import { colors } from '../../lib/theme/colors';
  * Redirects to sign-in when user is not authenticated.
  */
 export default function DrawerLayout() {
-    const { isSignedIn, getToken, isLoaded } = useAuth();
+    const { isSignedIn, isLoaded } = useAuth();
     const { clerkOrgId } = useActiveOrgContext();
     const lastOrgIdRef = useRef<string | undefined>();
 
@@ -26,8 +26,8 @@ export default function DrawerLayout() {
         if (lastOrgIdRef.current === clerkOrgId) return;
 
         lastOrgIdRef.current = clerkOrgId;
-        void refreshBillingStatus(clerkOrgId, getToken);
-    }, [clerkOrgId, getToken, isLoaded]);
+        prefetchBillingStatus(clerkOrgId);
+    }, [clerkOrgId, isLoaded]);
 
     if (!isSignedIn) {
         return <Redirect href="/sign-in" />;

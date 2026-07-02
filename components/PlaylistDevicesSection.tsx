@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from './ui/Text';
 import { colors } from '../lib/theme/colors';
 import { getStatusBadgeClasses } from '../lib/utils/device-status';
+import { prefetchDeviceDetail } from '../lib/bootstrap';
 import type { Location, PlaylistAssignedDevice } from '../lib/api';
 
 const APPROVE_HEX = '#16a34a';
@@ -35,16 +36,19 @@ function assignmentLabel(source: PlaylistAssignedDevice['assignmentSource']): st
 function AssignedDeviceRow({
     device,
     locationName,
+    onPressIn,
     onPress,
 }: {
     device: PlaylistAssignedDevice;
     locationName: string;
+    onPressIn?: () => void;
     onPress: () => void;
 }) {
     const { bg: statusBg, text: statusText } = getStatusBadgeClasses(device.status);
 
     return (
         <Pressable
+            onPressIn={onPressIn}
             onPress={onPress}
             className="flex-row items-center gap-3 p-3 rounded-xl bg-zinc-800 active:opacity-95"
         >
@@ -112,6 +116,7 @@ export function PlaylistDevicesSection({ devices, locations }: PlaylistDevicesSe
                             key={device.id}
                             device={device}
                             locationName={getLocationName(device, locations)}
+                            onPressIn={() => prefetchDeviceDetail(device.id)}
                             onPress={() => router.push(`/control/${device.id}`)}
                         />
                     ))}

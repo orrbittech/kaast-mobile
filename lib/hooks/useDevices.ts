@@ -10,6 +10,7 @@ import {
     type Device,
     type CreateDevice,
     type PairDevice,
+    type DeviceWithMediaSession,
 } from '../api';
 import { showSuccessNotification } from '../notifications/successNotification';
 import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
@@ -30,6 +31,7 @@ export function useDevices(clerkOrgId: string | undefined) {
 
 /** Single device by UUID. Used for control screen and device detail. */
 export function useDevice(id: string | undefined) {
+    const queryClient = useQueryClient();
     const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: deviceKeys.detail(id ?? ''),
@@ -37,6 +39,29 @@ export function useDevice(id: string | undefined) {
         enabled: !!id && queriesEnabled,
         staleTime: 15_000,
         refetchOnWindowFocus: true,
+        placeholderData: (previousData) => {
+            if (previousData) return previousData;
+            if (!id) return undefined;
+
+            const listEntries = queryClient.getQueriesData<Device[]>({
+                queryKey: deviceKeys.lists(),
+            });
+
+            for (const [, devices] of listEntries) {
+                const match = devices?.find((device) => device.id === id);
+                if (match) {
+                    return {
+                        ...match,
+                        mediaSession: null,
+                        activePlaylist: match.activePlaylistId
+                            ? { id: match.activePlaylistId, name: '' }
+                            : null,
+                    } satisfies DeviceWithMediaSession;
+                }
+            }
+
+            return undefined;
+        },
     });
 }
 

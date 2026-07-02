@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, ActivityIndicator, Pressable, Modal, ScrollView } from 'react-native';
+import {
+    View,
+    ActivityIndicator,
+    Pressable,
+    Modal,
+    ScrollView,
+    InteractionManager,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import {
     SkipBack,
     Play,
@@ -18,20 +26,19 @@ import {
     usePlaylists,
     useLoadPlaylistOnDevice,
     useAssignedPlaylist,
-    useActiveOrgContext,
 } from '../../../lib/hooks';
 import { Text } from '../../../components/ui/Text';
 import { RemoteControlButton } from '../../../components/RemoteControlButton';
 import { MediaCover } from '../../../components/MediaCover';
+import { ControlLoadedPlaylist } from '../../../components/ControlLoadedPlaylist';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
 import {
-    getDisplayTitle,
     getFirstItemCoverUrl,
     getSessionPreviewUri,
 } from '../../../lib/utils/media';
 import { mediaControlSocket } from '../../../lib/ws/media-control-socket';
-import type { MediaSession, PlaylistItem } from '../../../lib/api/types';
+import type { DeviceWithMediaSession, MediaSession } from '../../../lib/api/types';
 
 const VOLUME_STEP = 0.1;
 
@@ -49,11 +56,20 @@ function toLiveSessionState(session: MediaSession): LiveSessionState {
     };
 }
 
-function getItemTitle(item: PlaylistItem): string {
-    return getDisplayTitle({
-        mediaUrl: item.mediaUrl,
-        title: item.title ?? undefined,
-    });
+function buildLiveSessionFromEmbedded(
+    deviceId: string,
+    embedded: DeviceWithMediaSession['mediaSession'],
+): LiveSessionState | null {
+    if (!embedded) return null;
+    return {
+        deviceId,
+        mediaUrl: embedded.mediaUrl ?? null,
+        position: embedded.position,
+        duration: embedded.duration,
+        playing: embedded.playing,
+        volume: embedded.volume ?? 1,
+        updatedAt: embedded.updatedAt ?? new Date().toISOString(),
+    };
 }
 
 /**
@@ -61,36 +77,86 @@ function getItemTitle(item: PlaylistItem): string {
  */
 export default function ControlScreen() {
     const insets = useSafeAreaInsets();
+    const { orgId: clerkOrgId } = useAuth();
     const { 'device-id': deviceIdParam } = useLocalSearchParams<{
         'device-id': string;
     }>();
     const contentTopPadding = insets.top + DRAWER_HEADER_HEIGHT + 24;
 
     const { data: device, isLoading, error } = useDevice(deviceIdParam);
-    const { clerkOrgId } = useActiveOrgContext();
-    const { data: playlists } = usePlaylists(clerkOrgId ?? undefined);
-    const { data: assignedPlaylist } = useAssignedPlaylist(device?.deviceId);
+    const [loadPlaylistSectionReady, setLoadPlaylistSectionReady] =
+        useState(false);
+    const [loadPlaylistModalVisible, setLoadPlaylistModalVisible] =
+        useState(false);
+    const [wsConnected, setWsConnected] = useState(false);
+
+    const { data: playlists } = usePlaylists(clerkOrgId ?? undefined, {
+        enabled: loadPlaylistModalVisible,
+    });
+    const { data: assignedPlaylist, isLoading: assignedPlaylistLoading } =
+        useAssignedPlaylist(device?.deviceId, {
+            enabled: loadPlaylistSectionReady && !!device?.deviceId,
+        });
+
     const sendCommand = useSendMediaCommand(device?.deviceId);
     const loadPlaylist = useLoadPlaylistOnDevice(clerkOrgId ?? undefined);
     const embeddedSession = device?.mediaSession;
-    const [liveSession, setLiveSession] = useState<LiveSessionState | null>(null);
-    const [snapshotData, setSnapshotData] = useState<string | null>(null);
-    const lastMediaUrlRef = useRef<string | null>(null);
+    const [liveSession, setLiveSession] = useState<LiveSessionState | null>(
+        () =>
+            device?.deviceId
+                ? buildLiveSessionFromEmbedded(device.deviceId, embeddedSession)
+                : null,
+    );
+    const [snapshotData, setSnapshotData] = useState<string | null>(
+        () => embeddedSession?.snapshotData ?? null,
+    );
+    const lastMediaUrlRef = useRef<string | null>(
+        embeddedSession?.mediaUrl ?? null,
+    );
     const { data: polledSession } = useMediaSession(device?.deviceId, {
-        pollWhenDisconnected: liveSession == null,
+        enabled: !!device?.deviceId && !wsConnected && liveSession == null,
+        pollWhenDisconnected: !wsConnected && liveSession == null,
     });
-    const [optimisticVolume, setOptimisticVolume] = useState<number | null>(null);
-    const [loadPlaylistModalVisible, setLoadPlaylistModalVisible] = useState(false);
-    const [selectedLoadPlaylistId, setSelectedLoadPlaylistId] = useState<string | null>(null);
+    const [optimisticVolume, setOptimisticVolume] = useState<number | null>(
+        null,
+    );
+    const [selectedLoadPlaylistId, setSelectedLoadPlaylistId] = useState<
+        string | null
+    >(null);
 
     const session = liveSession ?? polledSession ?? embeddedSession ?? null;
     const volume = optimisticVolume ?? session?.volume ?? 1;
 
     useEffect(() => {
+        const task = InteractionManager.runAfterInteractions(() => {
+            setLoadPlaylistSectionReady(true);
+        });
+        return () => task.cancel();
+    }, []);
+
+    useEffect(() => {
+        if (!device?.deviceId) return;
+
+        const embedded = buildLiveSessionFromEmbedded(
+            device.deviceId,
+            device.mediaSession,
+        );
+        if (embedded) {
+            setLiveSession((prev) => prev ?? embedded);
+            if (device.mediaSession?.snapshotData) {
+                setSnapshotData((prev) => prev ?? device.mediaSession?.snapshotData ?? null);
+            }
+            if (device.mediaSession?.mediaUrl) {
+                lastMediaUrlRef.current = device.mediaSession.mediaUrl;
+            }
+        }
+    }, [device?.deviceId, device?.mediaSession]);
+
+    useEffect(() => {
         if (!device?.deviceId) return;
 
         void mediaControlSocket.connect(device.deviceId);
-        const unsub = mediaControlSocket.onSessionState((next) => {
+        const unsubSession = mediaControlSocket.onSessionState((next) => {
             const mediaUrl = next.mediaUrl ?? null;
             if (mediaUrl !== lastMediaUrlRef.current) {
                 lastMediaUrlRef.current = mediaUrl;
@@ -99,47 +165,40 @@ export default function ControlScreen() {
             setLiveSession(toLiveSessionState(next));
             setOptimisticVolume(null);
         });
+        const unsubConnection = mediaControlSocket.onConnectionChange(
+            setWsConnected,
+        );
 
         return () => {
-            unsub();
+            unsubSession();
+            unsubConnection();
             mediaControlSocket.disconnect();
             setLiveSession(null);
             setSnapshotData(null);
+            setWsConnected(false);
             lastMediaUrlRef.current = null;
         };
     }, [device?.deviceId]);
 
     useEffect(() => {
-        if (polledSession?.volume != null && optimisticVolume == null) {
-            setLiveSession((prev) => ({
-                ...(prev ?? toLiveSessionState(polledSession)),
-                ...toLiveSessionState(polledSession),
-            }));
-            if (polledSession.mediaUrl !== lastMediaUrlRef.current) {
-                lastMediaUrlRef.current = polledSession.mediaUrl ?? null;
-                setSnapshotData(polledSession.snapshotData ?? null);
-            }
+        if (polledSession?.volume == null || optimisticVolume != null) return;
+        setLiveSession((prev) => ({
+            ...(prev ?? toLiveSessionState(polledSession)),
+            ...toLiveSessionState(polledSession),
+        }));
+        if (polledSession.mediaUrl !== lastMediaUrlRef.current) {
+            lastMediaUrlRef.current = polledSession.mediaUrl ?? null;
+            setSnapshotData(polledSession.snapshotData ?? null);
         }
     }, [polledSession, optimisticVolume]);
 
-    useEffect(() => {
-        if (!embeddedSession || liveSession) return;
-        if (embeddedSession.snapshotData) {
-            setSnapshotData(embeddedSession.snapshotData);
-        }
-        if (embeddedSession.mediaUrl) {
-            lastMediaUrlRef.current = embeddedSession.mediaUrl;
-        }
-    }, [embeddedSession, liveSession]);
-
     const fallbackCoverUrl = getFirstItemCoverUrl(assignedPlaylist?.items);
     const previewMediaUrl = useMemo(
-        () =>
-            getSessionPreviewUri(session, snapshotData) ?? fallbackCoverUrl,
+        () => getSessionPreviewUri(session, snapshotData) ?? fallbackCoverUrl,
         [session, snapshotData, fallbackCoverUrl],
     );
 
-    if (isLoading) {
+    if (isLoading && !device) {
         return (
             <View
                 className="flex-1 bg-base justify-center items-center"
@@ -167,14 +226,14 @@ export default function ControlScreen() {
     const duration = session?.duration ?? 0;
 
     const handlePlayPause = () => {
-        if (!device?.deviceId) return;
+        if (!device.deviceId) return;
         sendCommand.mutate({
             command: session?.playing ? 'pause' : 'play',
         });
     };
 
     const handleSeek = (nextPosition: number) => {
-        if (!device?.deviceId) return;
+        if (!device.deviceId) return;
         sendCommand.mutate({
             command: 'seek',
             payload: { position: Math.max(0, nextPosition) },
@@ -182,7 +241,7 @@ export default function ControlScreen() {
     };
 
     const handleVolumeChange = (delta: number) => {
-        if (!device?.deviceId) return;
+        if (!device.deviceId) return;
         const nextVolume = Math.min(1, Math.max(0, volume + delta));
         setOptimisticVolume(nextVolume);
         if (mediaControlSocket.isConnected()) {
@@ -199,12 +258,14 @@ export default function ControlScreen() {
     };
 
     const openLoadPlaylistModal = () => {
-        setSelectedLoadPlaylistId(device?.activePlaylistId ?? playlists?.[0]?.id ?? null);
+        setSelectedLoadPlaylistId(
+            device.activePlaylistId ?? playlists?.[0]?.id ?? null,
+        );
         setLoadPlaylistModalVisible(true);
     };
 
     const handleLoadPlaylist = async () => {
-        if (!device?.deviceId || !selectedLoadPlaylistId) return;
+        if (!device.deviceId || !selectedLoadPlaylistId) return;
         const playlist = playlists?.find((p) => p.id === selectedLoadPlaylistId);
         if (!playlist) return;
         try {
@@ -272,17 +333,21 @@ export default function ControlScreen() {
                 </View>
 
                 <View className="flex-row items-center justify-center gap-8 mt-4">
-                    <RemoteControlButton onPress={() => handleVolumeChange(-VOLUME_STEP)}>
+                    <RemoteControlButton
+                        onPress={() => handleVolumeChange(-VOLUME_STEP)}
+                    >
                         <Volume1 size={24} color="#fff" />
                     </RemoteControlButton>
-                    <RemoteControlButton onPress={() => handleVolumeChange(VOLUME_STEP)}>
+                    <RemoteControlButton
+                        onPress={() => handleVolumeChange(VOLUME_STEP)}
+                    >
                         <Volume2 size={24} color="#fff" />
                     </RemoteControlButton>
                 </View>
 
                 <Pressable
                     onPress={openLoadPlaylistModal}
-                    disabled={!playlists?.length || loadPlaylist.isPending}
+                    disabled={loadPlaylist.isPending}
                     className="mt-8 flex-row items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 active:opacity-90 disabled:opacity-50"
                 >
                     <Ionicons name="list-outline" size={20} color="#ffffff" />
@@ -295,63 +360,24 @@ export default function ControlScreen() {
                     <Text className="text-zinc-400 text-sm font-sans-medium mb-2">
                         Loaded playlist
                     </Text>
-                    {!assignedPlaylist ? (
+                    {!loadPlaylistSectionReady || assignedPlaylistLoading ? (
+                        <View className="rounded-xl bg-zinc-800 px-4 py-6 items-center">
+                            <ActivityIndicator
+                                size="small"
+                                color={colors.primaryHex}
+                            />
+                        </View>
+                    ) : !assignedPlaylist ? (
                         <View className="rounded-xl bg-zinc-800 px-4 py-6 items-center">
                             <Text className="text-zinc-500 text-sm text-center">
                                 No playlist loaded
                             </Text>
                         </View>
                     ) : (
-                        <View className="rounded-xl bg-zinc-800 overflow-hidden">
-                            <View className="px-4 py-3 border-b border-zinc-700">
-                                <Text className="font-sans-semibold text-white">
-                                    {assignedPlaylist.name}
-                                </Text>
-                                <Text className="text-zinc-400 text-sm mt-0.5">
-                                    {assignedPlaylist.items?.length ?? 0}{' '}
-                                    {(assignedPlaylist.items?.length ?? 0) === 1
-                                        ? 'item'
-                                        : 'items'}
-                                </Text>
-                            </View>
-                            <ScrollView className="max-h-52">
-                                {assignedPlaylist.items?.map((item, index) => {
-                                    const isPlaying =
-                                        !!session?.mediaUrl &&
-                                        session.mediaUrl === item.mediaUrl;
-                                    return (
-                                        <View
-                                            key={item.id}
-                                            className={`flex-row items-center px-4 py-3 gap-3 ${
-                                                index > 0 ? 'border-t border-zinc-700/60' : ''
-                                            } ${isPlaying ? 'bg-zinc-700/40' : ''}`}
-                                        >
-                                            <View className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                                                <MediaCover
-                                                    mediaUrl={item.mediaUrl}
-                                                    fallbackSize="sm"
-                                                />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text
-                                                    className={`font-sans-medium text-sm ${
-                                                        isPlaying ? 'text-approve' : 'text-white'
-                                                    }`}
-                                                    numberOfLines={1}
-                                                >
-                                                    {getItemTitle(item)}
-                                                </Text>
-                                                {isPlaying && (
-                                                    <Text className="text-approve text-xs mt-0.5">
-                                                        Now playing
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </View>
-                                    );
-                                })}
-                            </ScrollView>
-                        </View>
+                        <ControlLoadedPlaylist
+                            assignedPlaylist={assignedPlaylist}
+                            session={session}
+                        />
                     )}
                 </View>
             </View>
@@ -377,16 +403,27 @@ export default function ControlScreen() {
                             Starts playback on {device.name}.
                         </Text>
                         {!playlists?.length ? (
-                            <Text className="text-zinc-400 text-center py-4 mb-4">
-                                No playlists yet. Create one first.
-                            </Text>
+                            <View className="py-4 mb-4 items-center">
+                                {!playlists ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={colors.primaryHex}
+                                    />
+                                ) : (
+                                    <Text className="text-zinc-400 text-center">
+                                        No playlists yet. Create one first.
+                                    </Text>
+                                )}
+                            </View>
                         ) : (
                             <ScrollView className="max-h-48 mb-6">
                                 <View className="flex-row flex-wrap gap-2">
                                     {playlists.map((p) => (
                                         <Pressable
                                             key={p.id}
-                                            onPress={() => setSelectedLoadPlaylistId(p.id)}
+                                            onPress={() =>
+                                                setSelectedLoadPlaylistId(p.id)
+                                            }
                                             className={`px-3 py-2 rounded-lg ${
                                                 selectedLoadPlaylistId === p.id
                                                     ? 'bg-approve'
@@ -420,7 +457,10 @@ export default function ControlScreen() {
                                 className="flex-1 py-3 rounded-xl bg-approve items-center disabled:opacity-50"
                             >
                                 {loadPlaylist.isPending ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#ffffff"
+                                    />
                                 ) : (
                                     <Text className="font-sans-medium text-white">
                                         Load & play

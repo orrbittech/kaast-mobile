@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
-import { hasCompletedOnboarding } from '../lib/onboarding';
+import { getOnboardingPrefetch, prefetchOnboarding } from '../lib/bootstrap';
 
 /**
  * Root redirect - onboarding → auth → drawer.
@@ -11,10 +11,11 @@ export default function IndexRedirect() {
     const { isSignedIn, isLoaded } = useAuth();
     const [onboardingComplete, setOnboardingComplete] = useState<
         boolean | null
-    >(null);
+    >(() => null);
 
     useEffect(() => {
-        hasCompletedOnboarding().then(setOnboardingComplete);
+        const pending = getOnboardingPrefetch() ?? prefetchOnboarding();
+        void pending.then(setOnboardingComplete);
     }, []);
 
     if (onboardingComplete === null || !isLoaded) {

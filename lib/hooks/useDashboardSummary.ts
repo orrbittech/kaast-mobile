@@ -18,6 +18,10 @@ export interface DashboardSummary {
     firstDeviceDbId: string | undefined;
     firstDeviceName: string | undefined;
     isLoading: boolean;
+    isOrgLoading: boolean;
+    isDevicesLoading: boolean;
+    isPlaylistsLoading: boolean;
+    isMediaLoading: boolean;
     error: Error | null;
 }
 
@@ -65,14 +69,21 @@ export function useDashboardSummary(): DashboardSummary {
         };
     }, [devices, mediaItems, playlists]);
 
-    const isLoading =
-        orgLoading || devicesLoading || playlistsLoading || mediaLoading;
+    const isOrgLoading = orgLoading;
+    const isDevicesLoading = devicesLoading;
+    const isPlaylistsLoading = playlistsLoading;
+    const isMediaLoading = mediaLoading;
+    const isLoading = isOrgLoading;
 
     return {
         ...summary,
         clerkOrgId,
         firstLocationId,
         isLoading,
+        isOrgLoading,
+        isDevicesLoading,
+        isPlaylistsLoading,
+        isMediaLoading,
         error,
     };
 }

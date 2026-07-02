@@ -6,11 +6,13 @@ import type { MediaCommand, MediaSession } from '../api/types';
 const WS_NAMESPACE = '/media';
 
 type SessionHandler = (session: MediaSession) => void;
+type ConnectionHandler = (connected: boolean) => void;
 
 class MediaControlSocketClient {
     private socket: Socket | null = null;
     private deviceId: string | null = null;
     private sessionHandler: SessionHandler | null = null;
+    private connectionHandlers = new Set<ConnectionHandler>();
 
     onSessionState(handler: SessionHandler): () => void {
         this.sessionHandler = handler;
@@ -19,6 +21,18 @@ class MediaControlSocketClient {
                 this.sessionHandler = null;
             }
         };
+    }
+
+    onConnectionChange(handler: ConnectionHandler): () => void {
+        this.connectionHandlers.add(handler);
+        handler(this.isConnected());
+        return () => {
+            this.connectionHandlers.delete(handler);
+        };
+    }
+
+    private notifyConnection(connected: boolean): void {
+        this.connectionHandlers.forEach((handler) => handler(connected));
     }
 
     async connect(deviceId: string): Promise<void> {
@@ -39,7 +53,12 @@ class MediaControlSocketClient {
         });
 
         this.socket.on('connect', () => {
+            this.notifyConnection(true);
             this.socket?.emit('client:subscribe', { deviceId });
+        });
+
+        this.socket.on('disconnect', () => {
+            this.notifyConnection(false);
         });
 
         this.socket.on('session:state', (payload: MediaSession) => {
@@ -55,6 +74,7 @@ class MediaControlSocketClient {
             this.socket = null;
         }
         this.deviceId = null;
+        this.notifyConnection(false);
     }
 
     sendCommand(command: Omit<MediaCommand, 'deviceId'>): void {

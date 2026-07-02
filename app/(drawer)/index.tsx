@@ -5,11 +5,20 @@ import {
     useDashboardSummary,
     useMediaSession,
 } from '../../lib/hooks';
+import { prefetchDeviceDetail } from '../../lib/bootstrap';
 import { Text } from '../../components/ui/Text';
 import { SummaryCard, StatRow } from '../../components/SummaryCard';
 import { formatDurationLong } from '../../lib/utils/formatDuration';
 import { DRAWER_HEADER_HEIGHT } from '../../lib/constants';
 import { colors } from '../../lib/theme/colors';
+
+function SectionLoading() {
+    return (
+        <View className="py-3 items-center">
+            <ActivityIndicator size="small" color={colors.primaryHex} />
+        </View>
+    );
+}
 
 /**
  * Dashboard - summary of devices, media, playlists, and now playing.
@@ -19,10 +28,10 @@ export default function DashboardScreen() {
     const insets = useSafeAreaInsets();
     const summary = useDashboardSummary();
     const { data: session } = useMediaSession(summary.firstDeviceId, {
-        enabled: !!summary.firstDeviceId,
+        enabled: !!summary.firstDeviceId && !summary.isDevicesLoading,
     });
 
-    if (summary.isLoading) {
+    if (summary.isOrgLoading) {
         return (
             <View
                 className="flex-1 bg-base items-center justify-center"
@@ -62,63 +71,74 @@ export default function DashboardScreen() {
                 paddingBottom: 48,
             }}
         >
-            {/* Devices Summary */}
             <SummaryCard
                 title="Devices"
                 href="/devices"
                 icon="phone-portrait-outline"
             >
-                <View className="gap-1">
-                    <StatRow label="Total" value={summary.totalDevices} />
-                    <StatRow
-                        label="Active"
-                        value={summary.activeDevices}
-                        highlight
-                    />
-                    <StatRow
-                        label="Inactive"
-                        value={summary.inactiveDevices}
-                        inactive
-                    />
-                </View>
+                {summary.isDevicesLoading ? (
+                    <SectionLoading />
+                ) : (
+                    <View className="gap-1">
+                        <StatRow label="Total" value={summary.totalDevices} />
+                        <StatRow
+                            label="Active"
+                            value={summary.activeDevices}
+                            highlight
+                        />
+                        <StatRow
+                            label="Inactive"
+                            value={summary.inactiveDevices}
+                            inactive
+                        />
+                    </View>
+                )}
             </SummaryCard>
 
-            {/* Media Summary */}
             <SummaryCard
                 title="Media"
                 href="/media"
                 icon="play-circle-outline"
             >
-                <View className="gap-1">
-                    <StatRow label="Media Files" value={summary.mediaFileCount} />
-                    <StatRow
-                        label="Total Duration"
-                        value={formatDurationLong(summary.totalPlayTimeSec)}
-                    />
-                </View>
+                {summary.isMediaLoading ? (
+                    <SectionLoading />
+                ) : (
+                    <View className="gap-1">
+                        <StatRow
+                            label="Media Files"
+                            value={summary.mediaFileCount}
+                        />
+                        <StatRow
+                            label="Total Duration"
+                            value={formatDurationLong(summary.totalPlayTimeSec)}
+                        />
+                    </View>
+                )}
             </SummaryCard>
 
-            {/* Playlists Summary */}
             <SummaryCard
                 title="Playlists"
                 href="/playlists"
                 icon="list-outline"
             >
-                <View className="gap-1">
-                    <StatRow label="Total" value={summary.totalPlaylists} />
-                    <StatRow
-                        label="Active"
-                        value={summary.activePlaylistCount}
-                        highlight
-                    />
-                    <StatRow
-                        label="Total Play Time"
-                        value={formatDurationLong(summary.totalPlayTimeSec)}
-                    />
-                </View>
+                {summary.isPlaylistsLoading ? (
+                    <SectionLoading />
+                ) : (
+                    <View className="gap-1">
+                        <StatRow label="Total" value={summary.totalPlaylists} />
+                        <StatRow
+                            label="Active"
+                            value={summary.activePlaylistCount}
+                            highlight
+                        />
+                        <StatRow
+                            label="Total Play Time"
+                            value={formatDurationLong(summary.totalPlayTimeSec)}
+                        />
+                    </View>
+                )}
             </SummaryCard>
 
-            {/* Now Playing */}
             <View className="mb-6">
                 <Text className="text-xl font-sans-semibold text-white mb-3">
                     Now Playing
@@ -157,7 +177,14 @@ export default function DashboardScreen() {
                                     href={`/control/${summary.firstDeviceDbId}`}
                                     asChild
                                 >
-                                    <Pressable className="mt-3 py-2 px-4 rounded-lg bg-approve self-start active:opacity-90">
+                                    <Pressable
+                                        onPressIn={() =>
+                                            prefetchDeviceDetail(
+                                                summary.firstDeviceDbId!,
+                                            )
+                                        }
+                                        className="mt-3 py-2 px-4 rounded-lg bg-approve self-start active:opacity-90"
+                                    >
                                         <Text className="font-sans-medium text-base text-white">
                                             Control
                                         </Text>

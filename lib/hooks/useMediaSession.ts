@@ -15,11 +15,14 @@ export function useMediaSession(
         queryKey: mediaSessionKeys.detail(deviceId ?? ''),
         queryFn: ({ signal }) => mediaApi.getSession(deviceId!, { signal }),
         enabled:
+            (options?.enabled ?? true) && !!deviceId && queriesEnabled,
+        refetchInterval:
+            pollWhenDisconnected &&
             (options?.enabled ?? true) &&
             !!deviceId &&
-            queriesEnabled &&
-            pollWhenDisconnected,
-        refetchInterval: pollWhenDisconnected ? 5000 : false,
+            queriesEnabled
+                ? 5000
+                : false,
         staleTime: 4_000,
     });
 }

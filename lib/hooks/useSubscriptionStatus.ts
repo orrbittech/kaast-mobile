@@ -57,9 +57,13 @@ export function useSubscriptionStatus(clerkOrgId?: string) {
         refetchOnMount: false,
         refetchOnReconnect: false,
         retry: 2,
+        initialData: () =>
+            clerkOrgId
+                ? queryClient.getQueryData(billingStatusQueryKey(clerkOrgId))
+                : undefined,
     });
 
-    const isActive = query.isSuccess && query.data.isActive === true;
+    const isActive = query.data?.isActive === true;
     const planSlug = query.data?.planSlug ?? null;
     const limits = query.data?.limits ?? getPlanLimits(planSlug);
     const usage = query.data?.usage ?? { devices: 0, playlists: 0, locations: 0 };
@@ -68,7 +72,7 @@ export function useSubscriptionStatus(clerkOrgId?: string) {
         limits.maxDevices !== null && usage.devices >= limits.maxDevices;
 
     return {
-        isLoading: !isLoaded || !clerkOrgId || !query.isFetched,
+        isLoading: !isLoaded || !clerkOrgId || (query.isPending && !query.data),
         isActive,
         status: query.data?.status ?? 'unknown',
         planSlug,

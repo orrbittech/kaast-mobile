@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './ui/Text';
 import { colors } from '../lib/theme/colors';
+import { prefetchDeviceDetail } from '../lib/bootstrap';
 import { getStatusBadgeClasses } from '../lib/utils/device-status';
 import type { Device } from '../lib/api';
 
@@ -117,7 +118,10 @@ export function DeviceCard({
             {/* Bottom - red chevron and click to view more */}
             <View className="flex-row items-center justify-end">
                 <Link href={`/control/${device.id}`} asChild>
-                    <Pressable className="flex-row items-center gap-2 py-2 px-3 rounded-xl active:opacity-80">
+                    <Pressable
+                        onPressIn={() => prefetchDeviceDetail(device.id)}
+                        className="flex-row items-center gap-2 py-2 px-3 rounded-xl active:opacity-80"
+                    >
                         <Text className="text-primary font-sans-medium text-sm">
                             Click to view more
                         </Text>

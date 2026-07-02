@@ -25,6 +25,7 @@ import { ConfirmModal } from '../../../components/ConfirmModal';
 import { UserReferenceRow } from '../../../components/UserReferenceRow';
 import { DRAWER_HEADER_HEIGHT } from '../../../lib/constants';
 import { colors } from '../../../lib/theme/colors';
+import { prefetchDeviceDetail } from '../../../lib/bootstrap';
 import { getStatusBadgeClasses } from '../../../lib/utils/device-status';
 import { isImageUrl, formatDurationShort } from '../../../lib/utils/media';
 function formatDate(iso?: string): string {
@@ -389,7 +390,10 @@ export default function DeviceDetailScreen() {
                         </Text>
                     </Pressable>
                     <Link href={`/control/${device.id}`} asChild>
-                        <Pressable className="flex-row items-center justify-center gap-3 py-4 rounded-xl bg-approve active:opacity-90">
+                        <Pressable
+                            onPressIn={() => prefetchDeviceDetail(device.id)}
+                            className="flex-row items-center justify-center gap-3 py-4 rounded-xl bg-approve active:opacity-90"
+                        >
                             <Ionicons name="play-outline" size={22} color="#ffffff" />
                             <Text className="font-sans-medium text-white">
                                 Control device

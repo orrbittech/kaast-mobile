@@ -32,12 +32,16 @@ import { useSubscriptionQueriesEnabled } from '../context/SubscriptionContext';
 export type { Playlist, PlaylistItem } from '../api';
 
 /** List playlists for an organization (includes items for counts and covers). */
-export function usePlaylists(clerkOrgId: string | undefined) {
+export function usePlaylists(
+    clerkOrgId: string | undefined,
+    options?: { enabled?: boolean },
+) {
     const queriesEnabled = useSubscriptionQueriesEnabled();
     return useQuery({
         queryKey: playlistKeys.mediaList(clerkOrgId ?? ''),
         queryFn: ({ signal }) => playlistsApi.listWithItems(clerkOrgId!, { signal }),
-        enabled: !!clerkOrgId && queriesEnabled,
+        enabled:
+            (options?.enabled ?? true) && !!clerkOrgId && queriesEnabled,
         staleTime: 30_000,
         refetchOnWindowFocus: true,
     });
